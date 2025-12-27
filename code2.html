@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro Code IDE v13.0 - Ultimate (Multi-Language)</title>
+    
+    <!-- FONTS -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <!-- CORE ENGINE -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    
+    <!-- JS/TS COMPILERS -->
+    <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
+    <script src="https://unpkg.com/typescript@5.4.5/lib/typescript.js"></script>
+    
+    <!-- PYTHON ENGINE (Lazy Loaded via Script usually, but putting stub here) -->
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"></script>
+
+    <!-- FORMATTERS -->
+    <script src="https://unpkg.com/prettier@3.2.5/standalone.js"></script>
+    <script src="https://unpkg.com/prettier@3.2.5/plugins/html.js"></script>
+    <script src="https://unpkg.com/prettier@3.2.5/plugins/babel.js"></script>
+    <script src="https://unpkg.com/prettier@3.2.5/plugins/postcss.js"></script>
+
+    <!-- TERMINAL -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.min.js"></script>
+    
+    <!-- MONACO EDITOR -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.js"></script>
+
+    <!-- NOTIFICATIONS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+
+    <style>
+        :root {
+            --bg-dark: #09090b; --bg-panel: #18181b; --bg-side: #121215;
+            --border: #27272a; --text: #e4e4e7; --text-dim: #71717a;
+            --primary: #6366f1; --primary-hover: #4f46e5;
+            --accent: #a855f7; --error: #ef4444; --success: #22c55e; --warn: #f59e0b;
+            --header-h: 42px; --footer-h: 24px; --act-bar-w: 48px; --side-w: 260px;
+        }
+
+        /* CORE */
+        * { box-sizing: border-box; outline: none; }
+        body { 
+            margin:0; background:var(--bg-dark); color:var(--text); 
+            font-family:'Inter', sans-serif; height:100vh; overflow:hidden; 
+            display:flex; flex-direction:column; user-select: none;
+        }
+        
+        ::-webkit-scrollbar { width:10px; height:10px; }
+        ::-webkit-scrollbar-track { background:transparent; }
+        ::-webkit-scrollbar-corner { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius:5px; border: 2px solid var(--bg-dark); }
+        ::-webkit-scrollbar-thumb:hover { background: #52525b; }
+
+        .flex { display:flex; } .col { flex-direction:column; }
+        .ac { align-items:center; } .jb { justify-content:space-between; }
+        .hidden { display:none !important; }
+        
+        /* LAYOUT COMPONENTS */
+        header { 
+            height:var(--header-h); background:var(--bg-panel); border-bottom:1px solid var(--border);
+            padding:0 12px; display:flex; align-items:center; gap: 12px; z-index: 50; flex-shrink: 0;
+        }
+        
+        .logo { font-weight:800; font-size:14px; letter-spacing:-0.5px; display:flex; align-items:center; gap:8px; color: #fff; }
+        .logo span { background:linear-gradient(to right, var(--primary), var(--accent)); -webkit-background-clip:text; color:transparent; font-size:16px; }
+
+        .btn {
+            background: transparent; color: #a1a1aa; border:1px solid transparent; padding:0 8px; border-radius:4px; 
+            cursor:pointer; font-size:13px; display:flex; align-items:center; gap:6px; transition:0.2s; height: 26px;
+        }
+        .btn:hover { background: rgba(255,255,255,0.08); color:white; }
+        .btn:active { transform: translateY(1px); }
+        .btn.primary { background: var(--primary); color:white; font-weight:600; padding:0 12px; border: 1px solid var(--primary-hover); }
+        .btn.primary:hover { background: var(--primary-hover); box-shadow: 0 0 10px rgba(99, 102, 241, 0.4); }
+        
+        /* WORKSPACE */
+        #workspace { flex:1; display:flex; overflow:hidden; position:relative; }
+        
+        .act-bar { width:var(--act-bar-w); background:var(--bg-side); border-right:1px solid var(--border); display:flex; flex-direction:column; align-items:center; padding-top:10px; z-index:10; flex-shrink: 0;}
+        .act-btn { width:40px; height:40px; display:flex; align-items:center; justify-content:center; color:#52525b; font-size:20px; cursor:pointer; margin-bottom:4px; transition:0.2s; position:relative; border-radius:8px;}
+        .act-btn:hover { color:#a1a1aa; background: rgba(255,255,255,0.05); }
+        .act-btn.active { color:#e4e4e7; background: rgba(255,255,255,0.08); }
+        .act-btn.active::before { content:''; position:absolute; left:0; top:10px; bottom:10px; width:3px; background:var(--primary); border-radius:0 4px 4px 0; }
+
+        .sidebar { width:var(--side-w); background:var(--bg-side); border-right:1px solid var(--border); display:none; flex-direction:column; }
+        .sidebar.active { display:flex; }
+        .sb-head { height:36px; padding:0 12px; display:flex; align-items:center; justify-content:space-between; font-size:11px; font-weight:700; color:#a1a1aa; text-transform:uppercase; letter-spacing:0.5px; background: #161619;}
+        
+        /* TREE VIEW */
+        .tree { flex:1; overflow-y:auto; padding:4px 0; }
+        .t-item { padding:4px 0; cursor:pointer; color:#a1a1aa; font-size:13px; display:flex; align-items:center; transition:0.1s; user-select: none; position: relative; }
+        .t-item:hover { background:#2a2a2d; color:#e4e4e7; }
+        .t-item.active { background:#37373d !important; color:#fff; }
+        .t-item.active::before { content:''; position:absolute; left:0; top:0; bottom:0; width:1px; background:var(--primary); }
+        .t-indent { width:100%; display: flex; align-items: center; padding: 3px 0; }
+        
+        /* EDITOR */
+        #main { flex:1; display:flex; flex-direction:column; min-width:0; background:var(--bg-dark); position:relative; overflow: hidden; }
+        .tabs { display:flex; background:var(--bg-panel); height:35px; overflow-x:auto; border-bottom:1px solid var(--border); scrollbar-width:none; flex-shrink: 0; }
+        .tab { display:flex; align-items:center; padding:0 12px; height:100%; border-right:1px solid #27272a; font-size:12px; color:#71717a; cursor:pointer; background: #18181b; min-width:120px; max-width:200px; gap: 8px; border-top: 2px solid transparent; transition: all 0.2s;}
+        .tab.active { background:var(--bg-dark); color:#e4e4e7; border-top-color:var(--primary); }
+        .tab .close { width:16px; height:16px; display:flex; align-items:center; justify-content:center; border-radius:4px; opacity:0; transition:0.2s; font-size: 14px;}
+        .tab:hover .close { opacity:0.8; }
+        .tab .close:hover { background:#ef4444; color: white; opacity: 1;}
+        
+        /* BOTTOM PANEL */
+        #panel-btm { height:200px; border-top:1px solid var(--border); background:var(--bg-panel); display:flex; flex-direction:column; position:absolute; bottom:0; left:0; right:0; z-index: 20; box-shadow: 0 -4px 10px rgba(0,0,0,0.2); }
+        .panel-tab { padding:0 12px; height:100%; display:flex; align-items:center; cursor:pointer; border-bottom:1px solid transparent; color: #71717a; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; transition: 0.2s; }
+        .panel-tab:hover { color: #e4e4e7; }
+        .panel-tab.active { color:#e4e4e7; border-bottom-color:var(--primary); }
+
+        /* PREVIEW */
+        #preview-wrap { width:0; background:white; display:flex; flex-direction:column; border-left:1px solid var(--border); transition: width 0.1s; position:relative; z-index: 15; }
+        #preview-wrap.visible { width: 50%; }
+        
+        /* HELPERS & UTILS */
+        .resizer { position:absolute; z-index:99; background:transparent; transition: background 0.2s; }
+        .resizer:hover, .resizer.dragging { background:var(--primary); transition-delay: 0.2s; }
+        .r-w { width:4px; height:100%; cursor:col-resize; top:0; }
+        .r-h { width:100%; height:4px; cursor:row-resize; top:0; left:0; }
+
+        .image-viewer { flex:1; display:flex; align-items:center; justify-content:center; background:repeating-conic-gradient(#18181b 0% 25%, #27272a 0% 50%) 50% / 20px 20px; overflow:auto; padding:20px; }
+        .image-viewer img { max-width:100%; box-shadow:0 0 20px rgba(0,0,0,0.5); }
+
+        /* FOOTER */
+        footer { height:var(--footer-h); background:var(--primary); color:white; display:flex; align-items:center; padding:0 12px; font-size:11px; justify-content:space-between; flex-shrink: 0; z-index: 55; }
+        .f-stat { display:flex; gap:12px; font-weight:500; }
+        .f-stat span { cursor: pointer; opacity: 0.9; } .f-stat span:hover { opacity: 1; text-decoration: underline;}
+
+        /* MODALS & LOADERS */
+        #loader-overlay { position:fixed; inset:0; background:#09090b; z-index:10000; display:flex; flex-direction:column; justify-content:center; align-items:center; }
+        .spinner { width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.1); border-radius: 50%; border-top-color: var(--primary); animation: spin 0.8s ease-in-out infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* AI CHAT */
+        #ai-float { position:absolute; right:20px; bottom:20px; width:400px; height:600px; background:#18181b; border:1px solid #333; z-index:100; border-radius:12px; display:none; flex-direction:column; box-shadow:0 20px 50px rgba(0,0,0,0.5); animation: popUp 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28); }
+        @keyframes popUp { from { transform: translateY(20px) scale(0.95); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
+        .msg-bubble { background: #27272a; padding: 8px 12px; border-radius: 8px; margin-bottom: 8px; font-size: 13px; max-width: 90%; line-height: 1.4; }
+        .msg-user { background: var(--primary); color: white; align-self: flex-end; }
+        .msg-sys { color: #a1a1aa; border: 1px solid #333; }
+        .code-block { background: #111; padding: 8px; border-radius: 4px; font-family: 'JetBrains Mono'; margin-top: 5px; white-space: pre-wrap; font-size: 11px; overflow-x: auto; border: 1px solid #333;}
+    </style>
+</head>
+<body>
+
+<!-- BOOT SCREEN -->
+<div id="loader-overlay">
+    <div class="logo" style="margin-bottom:20px; font-size: 24px;"><i class="fas fa-code"></i> PRO CODE <span>IDE</span></div>
+    <div class="spinner"></div>
+    <div id="boot-status" style="margin-top:15px; font-family:'JetBrains Mono'; font-size:12px; color:#71717a">INITIALIZING KERNEL...</div>
+</div>
+
+<header>
+    <div class="logo"><i class="fas fa-layer-group" style="color:var(--primary)"></i> PRO <span>CODE</span> <span style="font-size:10px; background:#4f46e5; color: white; padding:2px 6px; border-radius:4px">v13.0</span></div>
+    
+    <div style="width: 1px; height: 16px; background: #333;"></div>
+    
+    <button class="btn" onclick="Command.trigger('save')" title="Save (Ctrl+S)"><i class="fas fa-save"></i></button>
+    <button class="btn" onclick="FS.exportZip()" title="Download Project"><i class="fas fa-download"></i></button>
+    <button class="btn" onclick="FS.importPrompt()" title="Import"><i class="fas fa-folder-open"></i></button>
+    
+    <div style="flex:1"></div>
+    
+    <div style="background: #27272a; border-radius: 6px; display:flex; align-items:center; padding: 4px 10px; gap: 8px; border: 1px solid #3f3f46;">
+        <i class="fas fa-search" style="font-size: 11px; color: #71717a;"></i>
+        <input id="spotlight" placeholder="Command Palette (Ctrl+P)" style="background:transparent; border:none; color:white; font-size: 12px; width: 200px;">
+    </div>
+
+    <div style="flex:1"></div>
+
+    <button class="btn" onclick="Layout.toggleLayout('terminal')" title="Terminal (Ctrl+`)"><i class="fas fa-terminal"></i></button>
+    <button class="btn" onclick="Layout.toggleLayout('preview')" title="Preview (Ctrl+B)"><i class="fas fa-columns"></i></button>
+    <button class="btn primary" onclick="Runner.exec()" title="Run (F5)"> <i class="fas fa-play"></i> RUN</button>
+</header>
+
+<div id="workspace">
+    <!-- Activity Bar -->
+    <div class="act-bar">
+        <div class="act-btn active" data-id="expl" onclick="Layout.setSide('expl')"><i class="far fa-copy"></i></div>
+        <div class="act-btn" data-id="search" onclick="Layout.setSide('search')"><i class="fas fa-search"></i></div>
+        <div class="act-btn" data-id="git" onclick="Layout.setSide('git')"><i class="fas fa-code-branch"></i></div>
+        <div class="act-btn" data-id="ext" onclick="Layout.setSide('ext')"><i class="fas fa-cubes"></i></div>
+        <div style="flex:1"></div>
+        <div class="act-btn" onclick="Layout.setSide('set')"><i class="fas fa-cog"></i></div>
+        <div class="act-btn" onclick="AI.toggle()" style="color: #a855f7"><i class="fas fa-robot"></i></div>
+    </div>
+
+    <!-- Explorer Sidebar -->
+    <div id="side-expl" class="sidebar active">
+        <div class="sb-head">
+            <span>Project</span>
+            <div class="flex gap-2">
+                <i class="fas fa-file-medical" onclick="FS.createFilePrompt()" title="New File" style="cursor:pointer; margin-right:5px"></i>
+                <i class="fas fa-folder-plus" onclick="FS.createFolderPrompt()" title="New Folder" style="cursor:pointer"></i>
+            </div>
+        </div>
+        <div id="file-tree" class="tree"></div>
+    </div>
+    
+    <!-- Other Sidebars (Hidden primarily) -->
+    <div id="side-search" class="sidebar"><div class="sb-head"><span>Search</span></div><div style="padding:10px"><input placeholder="Search..." class="btn" style="width:100%; text-align:left; background:#27272a;"></div></div>
+    <div id="side-git" class="sidebar"><div class="sb-head"><span>Source Control</span></div><div style="padding:10px; color:#71717a; text-align:center; font-size:12px;">Changes synced<br>Git Graph Ready</div></div>
+
+    <div class="resizer r-w" id="rs-side" style="right:0"></div>
+
+    <!-- Main Editor Area -->
+    <div id="main">
+        <div class="tabs" id="tab-list"></div>
+        <!-- Monaco Mount -->
+        <div id="editor-container" style="flex:1; position:relative;">
+             <div id="monaco-root" style="width:100%; height:100%;"></div>
+             <div id="empty-state" style="position:absolute; inset:0; display:flex; flex-direction:column; justify-content:center; align-items:center; background:var(--bg-dark);">
+                <i class="fab fa-connectdevelop" style="font-size:64px; color:#27272a; margin-bottom:16px;"></i>
+                <div style="color:#52525b">Open a file or Create new project</div>
+             </div>
+        </div>
+
+        <!-- Terminal Panel -->
+        <div id="panel-btm" class="hidden">
+            <div class="resizer r-h" id="rs-panel" style="cursor: row-resize;"></div>
+            <div style="height:30px; display:flex; align-items:center; background:var(--bg-panel); border-bottom:1px solid #333;">
+                <div class="panel-tab active" onclick="Panel.show('term')">TERMINAL</div>
+                <div class="panel-tab" onclick="Panel.show('console')">DEBUG CONSOLE</div>
+                <div class="panel-tab" onclick="Panel.show('git')">GIT GRAPH</div>
+                <div style="flex:1"></div>
+                <div class="panel-tab" onclick="Term.instance.clear()"><i class="fas fa-trash"></i></div>
+                <div class="panel-tab" onclick="Layout.toggleLayout('terminal')"><i class="fas fa-times"></i></div>
+            </div>
+            <div id="panel-body" style="flex:1; background:#09090b; position:relative; overflow:hidden;">
+                <div id="term-host" class="fit-height" style="height:100%; padding-left: 5px;"></div>
+                <div id="console-host" class="fit-height hidden" style="height:100%; padding:10px; overflow:auto; font-family:'JetBrains Mono', monospace; font-size:12px;"></div>
+                <div id="git-host" class="fit-height hidden" style="height:100%; display:flex; align-items:center; justify-content:center; color:#52525b;">Simulated Git Graph Visualization</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Preview / Runner -->
+    <div class="resizer r-w hidden" id="rs-preview" style="left:0;"></div>
+    <div id="preview-wrap">
+        <div class="url-bar flex ac jb" style="height:32px; background:#f4f4f5; padding:0 8px; border-bottom:1px solid #ddd;">
+             <div class="flex ac gap-2" style="font-size:12px; color:#444;">
+                 <i class="fas fa-globe"></i> localhost:3000
+             </div>
+             <div class="flex gap-2">
+                 <i class="fas fa-sync" onclick="Runner.exec()" style="cursor:pointer; color:#666; font-size:12px;"></i>
+                 <i class="fas fa-external-link-alt" onclick="Runner.popout()" style="cursor:pointer; color:#666; font-size:12px;"></i>
+             </div>
+        </div>
+        <iframe id="preview-frame" style="flex:1; border:none; background:white;"></iframe>
+    </div>
+</div>
+
+<footer>
+    <div class="f-stat"><i class="fas fa-code-branch"></i> main*</div>
+    <div class="f-stat"><span id="err-count"><i class="fas fa-times-circle"></i> 0</span> <span id="warn-count"><i class="fas fa-exclamation-triangle"></i> 0</span></div>
+    <div style="flex:1"></div>
+    <div class="f-stat">
+        <span id="cursor-pos">Ln 1, Col 1</span>
+        <span id="file-lang">JavaScript</span>
+        <span id="file-enc">UTF-8</span>
+    </div>
+    <div style="width:20px; background:#4f46e5; text-align:center"><i class="fas fa-bell"></i></div>
+</footer>
+
+<!-- AI BOX -->
+<div id="ai-float" class="col">
+    <div class="jb flex ac" style="padding:12px; border-bottom:1px solid #333; background:#1f1f22; border-radius:12px 12px 0 0;">
+        <span style="font-weight:bold; color:var(--primary)"><i class="fas fa-sparkles"></i> AI Assistant</span>
+        <i class="fas fa-times" style="cursor:pointer" onclick="AI.toggle()"></i>
+    </div>
+    <div id="ai-messages" style="flex:1; overflow-y:auto; padding:15px; display:flex; flex-direction:column; gap:10px;">
+        <div class="msg-bubble msg-sys">Hello! I can explain code, debug errors, or generate React components for you.</div>
+    </div>
+    <div style="padding:10px; border-top:1px solid #333; background:#18181b">
+        <input id="ai-input" class="btn" style="width:100%; height:36px; border:1px solid #333; color:white; background:black;" placeholder="Ask me anything..." onkeydown="if(event.key==='Enter') AI.send()">
+    </div>
+</div>
+
+<script>
+/** 
+ * PRO CODE IDE v13.0 CORE ENGINE
+ */
+
+// GLOBAL STATE
+const State = {
+    files: {}, // Path -> Content
+    tabs: [], // Array of Paths
+    activeTab: null,
+    term: null, // Terminal Instance
+    pyodide: null, // Python Runtime
+    
+    // Project Defaults
+    templates: {
+        'vanilla': {
+            'index.html': `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>App</title>
+  <style> body { font-family: sans-serif; display: grid; place-items: center; height: 100vh; background: #f0f0f0; } h1 { color: #6366f1; } </style>
+</head>
+<body>
+  <h1>Hello World</h1>
+  <script src="./main.js"><\/script>
+</body>
+</html>`,
+            'main.js': `console.log('App Started');\ndocument.querySelector('h1').innerText = 'Hello from ProCode!';`
+        },
+        'react': {
+            'index.html': `<body><div id="root"></div><script type="module" src="/src/main.jsx"><\/script></body>`,
+            'src/main.jsx': `import React from 'react';\nimport { createRoot } from 'react-dom/client';\nimport App from './App.jsx';\ncreateRoot(document.getElementById('root')).render(<App />);`,
+            'src/App.jsx': `import React, { useState } from 'react';\nimport confetti from 'canvas-confetti';\n\nexport default function App() { \n  const [c, setC] = useState(0);\n  const run = () => { setC(c+1); confetti(); };\n  return (\n    <div style={{fontFamily:'sans-serif', textAlign:'center', marginTop:'50px'}}>\n      <h1>React + Vite Style</h1>\n      <button onClick={run} style={{padding:'10px 20px', fontSize:'18px'}}>Count is {c}</button>\n    </div>\n  );\n}`,
+        },
+        'python': {
+            'main.py': `import sys\nprint(f"Python version: {sys.version}")\n\ndef greet(name):\n    return f"Hello, {name}!"\n\nprint(greet("Pro Code User"))`
+        }
+    }
+};
+
+const Utils = {
+    toast: (msg, type='info') => Toastify({ text: msg, duration: 3000, gravity: "bottom", position: "right", style: { background: type=='error'?'#ef4444':type=='success'?'#22c55e':'#3b82f6' } }).showToast(),
+    uuid: () => Math.random().toString(36).substr(2, 9),
+    debounce: (func, wait) => { let t; return function(...args) { clearTimeout(t); t = setTimeout(() => func.apply(this, args), wait); }; },
+    ext: (path) => path.split('.').pop().toLowerCase()
+};
+
+// 1. FILE SYSTEM (Virtual Memory FS)
+const FS = {
+    init() {
+        // Load from LocalStorage or Default Template
+        const saved = localStorage.getItem('pc_v13_fs');
+        State.files = saved ? JSON.parse(saved) : {...State.templates.react};
+        this.refreshTree();
+    },
+    save() {
+        localStorage.setItem('pc_v13_fs', JSON.stringify(State.files));
+        const btn = document.querySelector('.fa-save');
+        btn.style.color = '#22c55e';
+        setTimeout(() => btn.style.color = 'inherit', 1000);
+    },
+    exists(path) { return State.files.hasOwnProperty(path); },
+    write(path, content) { State.files[path] = content; this.save(); },
+    read(path) { return State.files[path]; },
+    delete(path) { delete State.files[path]; Tabs.close(path); this.save(); this.refreshTree(); },
+    rename(oldP, newP) {
+        if(this.exists(newP)) return Utils.toast('Exists already', 'error');
+        const content = State.files[oldP];
+        delete State.files[oldP];
+        State.files[newP] = content;
+        if(Tabs.isActive(oldP)) Tabs.open(newP); // Reopen as new
+        Tabs.close(oldP);
+        this.save(); this.refreshTree();
+    },
+    // Create nested directory structure for tree view
+    refreshTree() {
+        const root = document.getElementById('file-tree');
+        root.innerHTML = '';
+        const structure = {};
+        
+        Object.keys(State.files).sort().forEach(path => {
+            const parts = path.split('/');
+            let current = structure;
+            parts.forEach((part, i) => {
+                if(!current[part]) current[part] = (i === parts.length - 1) ? { __file: true, path: path } : {};
+                current = current[part];
+            });
+        });
+
+        const renderNode = (node, container, level) => {
+            Object.entries(node).sort((a,b) => {
+                if(a[1].__file && !b[1].__file) return 1; // Folder first
+                if(!a[1].__file && b[1].__file) return -1;
+                return a[0].localeCompare(b[0]);
+            }).forEach(([name, data]) => {
+                if (name === '__file' || name === 'path') return;
+                
+                const item = document.createElement('div');
+                item.className = 't-item';
+                const padding = 15 + (level * 15);
+                
+                if (data.__file) {
+                    // File
+                    const ext = name.split('.').pop();
+                    const iconMap = {js:'fab fa-js #facc15', jsx:'fab fa-react #3b82f6', html:'fab fa-html5 #ea580c', css:'fab fa-css3 #0ea5e9', json:'fas fa-code #a1a1aa', py:'fab fa-python #3b82f6', md:'fab fa-markdown #fff'};
+                    const [cls, col] = (iconMap[ext] || 'fas fa-file #71717a').split(' ');
+                    
+                    item.innerHTML = `<div class="t-indent" style="padding-left:${padding}px"><i class="${cls}" style="color:${col}; width:20px; text-align:center"></i> ${name}</div>`;
+                    item.onclick = () => Tabs.open(data.path);
+                    item.setAttribute('data-path', data.path);
+                    if(State.activeTab === data.path) item.classList.add('active');
+                    
+                    // Context Menu Trigger (Right Click)
+                    item.oncontextmenu = (e) => FS.contextMenu(e, data.path, 'file');
+                } else {
+                    // Folder
+                    item.innerHTML = `<div class="t-indent" style="padding-left:${padding}px"><i class="fas fa-folder" style="color:#d97706; width:20px; text-align:center"></i> ${name}</div>`;
+                    const subContainer = document.createElement('div');
+                    subContainer.className = 't-sub hidden'; // Collapsed by default
+                    // But open if it contains active file (Simple auto expand logic)
+                    if(State.activeTab && State.activeTab.startsWith(name + '/')) subContainer.classList.remove('hidden');
+
+                    item.onclick = (e) => {
+                        e.stopPropagation();
+                        subContainer.classList.toggle('hidden');
+                        item.querySelector('i').className = subContainer.classList.contains('hidden') ? 'fas fa-folder' : 'fas fa-folder-open';
+                    };
+                    renderNode(data, subContainer, level + 1);
+                    container.appendChild(item);
+                    container.appendChild(subContainer);
+                    return; // Return early because we appended manually
+                }
+                container.appendChild(item);
+            });
+        };
+        renderNode(structure, root, 0);
+    },
+    
+    // Quick Actions
+    createFilePrompt() { const p = prompt("Path (e.g., components/Test.js):"); if(p) this.write(p, ""); this.refreshTree(); Tabs.open(p); },
+    createFolderPrompt() { const p = prompt("Folder name:"); if(p) this.write(p + "/.keep", ""); this.refreshTree(); },
+    
+    contextMenu(e, path, type) {
+        e.preventDefault();
+        const menu = document.createElement('div');
+        menu.style = `position:fixed; left:${e.clientX}px; top:${e.clientY}px; background:#27272a; border:1px solid #333; padding:5px; border-radius:5px; z-index:9999; width: 120px; box-shadow:0 4px 12px black;`;
+        const action = (icon, text, cb) => {
+            const d = document.createElement('div');
+            d.innerHTML = `<i class="fas ${icon}" style="width:20px"></i> ${text}`;
+            d.style = "padding:5px 8px; font-size:12px; cursor:pointer; color:#eee; border-radius:3px;";
+            d.onmouseenter = () => d.style.background = "#6366f1";
+            d.onmouseleave = () => d.style.background = "transparent";
+            d.onclick = () => { cb(); document.body.removeChild(menu); };
+            menu.appendChild(d);
+        };
+        action('fa-edit', 'Rename', () => { const newN = prompt('New path:', path); if(newN) FS.rename(path, newN); });
+        action('fa-trash', 'Delete', () => { if(confirm('Delete ' + path + '?')) FS.delete(path); });
+        
+        document.body.appendChild(menu);
+        setTimeout(() => document.addEventListener('click', () => { if(menu.parentNode) menu.parentNode.removeChild(menu); }, {once:true}), 0);
+    },
+    
+    async exportZip() {
+        const zip = new JSZip();
+        Object.entries(State.files).forEach(([k,v]) => k.endsWith('.keep') ? null : zip.file(k, v));
+        const blob = await zip.generateAsync({type:"blob"});
+        saveAs(blob, "project_v13.zip");
+        Utils.toast("Project exported!");
+    },
+
+    importPrompt() {
+        const input = document.createElement('input'); input.type='file'; input.accept = '.zip, .json, .js, .html, .css, .py';
+        input.onchange = async (e) => {
+            const file = e.target.files[0];
+            if(file.name.endsWith('.zip')) {
+                const zip = await JSZip.loadAsync(file);
+                for (const [path, entry] of Object.entries(zip.files)) {
+                    if (!entry.dir) State.files[path] = await entry.async("string");
+                }
+                FS.save(); FS.refreshTree(); Utils.toast('Imported ZIP project');
+            } else {
+                // Single File Import
+                const reader = new FileReader();
+                reader.onload = () => { FS.write(file.name, reader.result); FS.refreshTree(); Tabs.open(file.name); };
+                reader.readAsText(file);
+            }
+        };
+        input.click();
+    }
+};
+
+// 2. EDITOR MANAGER (Monaco Wrapper)
+const Editor = {
+    instance: null,
+    model: null,
+    init() {
+        require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' }});
+        require(['vs/editor/editor.main'], () => {
+            // Theme Customization
+            monaco.editor.defineTheme('procode-dark', {
+                base: 'vs-dark', inherit: true, 
+                rules: [{ token: '', background: '09090b' }],
+                colors: { 'editor.background': '#09090b' }
+            });
+
+            this.instance = monaco.editor.create(document.getElementById('monaco-root'), {
+                value: "",
+                language: 'javascript',
+                theme: 'procode-dark',
+                fontSize: 14,
+                fontFamily: 'JetBrains Mono',
+                minimap: { enabled: true, scale: 0.75 },
+                padding: { top: 15 },
+                automaticLayout: false, // Handle manually with ResizeObserver for better perf
+                smoothScrolling: true,
+                cursorBlinking: "smooth",
+            });
+            
+            // Events
+            this.instance.onDidChangeModelContent(() => {
+                if(State.activeTab) {
+                    const val = this.instance.getValue();
+                    // Don't save empty if its virtual
+                    State.files[State.activeTab] = val;
+                    // Debounce Auto-Save
+                    if (this._saveT) clearTimeout(this._saveT);
+                    this._saveT = setTimeout(() => FS.save(), 1000);
+                }
+            });
+            
+            this.instance.onDidChangeCursorPosition((e) => {
+                document.getElementById('cursor-pos').innerText = `Ln ${e.position.lineNumber}, Col ${e.position.column}`;
+            });
+
+            // Handle Resize
+            new ResizeObserver(() => { this.instance.layout(); }).observe(document.getElementById('editor-container'));
+            
+            // Initial UI state check
+            document.getElementById('loader-overlay').style.display = 'none';
+        });
+    },
+    
+    setFile(path) {
+        if (!this.instance) return;
+        const content = State.files[path] || "";
+        const ext = Utils.ext(path);
+        
+        // Handle Images View
+        if(['png','jpg','svg','gif'].includes(ext)) {
+            document.getElementById('monaco-root').style.display = 'none';
+            // Show Image viewer (Mock for text files based files, needs DataURI for real bin, assumed text here)
+            // Ideally we'd have FS store Base64 for images. 
+            // This is a "Stub" since we store strings in this demo.
+            return;
+        }
+
+        document.getElementById('monaco-root').style.display = 'block';
+        document.getElementById('empty-state').style.display = 'none';
+
+        const model = monaco.editor.createModel(content, undefined, monaco.Uri.file(path));
+        this.instance.setModel(model);
+        
+        // Lang Status
+        const langMap = {js:'JavaScript', py:'Python', css:'CSS', html:'HTML', json:'JSON'};
+        document.getElementById('file-lang').innerText = langMap[ext] || ext.toUpperCase();
+    }
+};
+
+// 3. TAB MANAGER
+const Tabs = {
+    open(path) {
+        if(!State.tabs.includes(path)) State.tabs.push(path);
+        this.render();
+        this.activate(path);
+    },
+    close(path) {
+        State.tabs = State.tabs.filter(p => p !== path);
+        if (State.activeTab === path) {
+            State.activeTab = State.tabs.length > 0 ? State.tabs[State.tabs.length-1] : null;
+        }
+        this.render();
+        this.activate(State.activeTab);
+    },
+    activate(path) {
+        State.activeTab = path;
+        
+        // Update Tab UI
+        document.querySelectorAll('.tab').forEach(t => {
+            t.classList.toggle('active', t.getAttribute('data-path') === path);
+        });
+
+        // Update Tree UI
+        document.querySelectorAll('.t-item').forEach(t => {
+            t.classList.toggle('active', t.getAttribute('data-path') === path);
+        });
+
+        // Update Editor
+        if(path) {
+            Editor.setFile(path);
+        } else {
+            document.getElementById('monaco-root').style.display = 'none';
+            document.getElementById('empty-state').style.display = 'flex';
+        }
+    },
+    isActive(path) { return State.activeTab === path; },
+    render() {
+        const c = document.getElementById('tab-list');
+        c.innerHTML = '';
+        State.tabs.forEach(path => {
+            const name = path.split('/').pop();
+            const div = document.createElement('div');
+            div.className = `tab ${path===State.activeTab?'active':''}`;
+            div.setAttribute('data-path', path);
+            div.innerHTML = `<i class="fas fa-file-code"></i> ${name} <div class="close" onclick="event.stopPropagation(); Tabs.close('${path}')">×</div>`;
+            div.onclick = () => this.activate(path);
+            c.appendChild(div);
+        });
+    }
+};
+
+// 4. TERMINAL & CONSOLE
+const Term = {
+    instance: null,
+    fit: null,
+    cwd: '/', // Virtual Current Working Directory
+    
+    init() {
+        this.instance = new Terminal({
+            theme: { background: '#09090b' },
+            fontFamily: 'JetBrains Mono', fontSize: 13,
+            cursorBlink: true
+        });
+        this.fit = new FitAddon.FitAddon();
+        this.instance.loadAddon(this.fit);
+        this.instance.loadAddon(new WebLinksAddon.WebLinksAddon());
+        
+        this.instance.open(document.getElementById('term-host'));
+        this.instance.write('\x1b[35mPro Code Terminal\x1b[0m \r\n$ ');
+        
+        // Simple Shell Implementation
+        let cmd = '';
+        this.instance.onData(e => {
+            switch(e) {
+                case '\r': // Enter
+                    this.instance.write('\r\n');
+                    this.exec(cmd);
+                    cmd = '';
+                    break;
+                case '\u007f': // Backspace
+                    if (cmd.length > 0) {
+                        this.instance.write('\b \b');
+                        cmd = cmd.slice(0, -1);
+                    }
+                    break;
+                default: // Type
+                    this.instance.write(e);
+                    cmd += e;
+            }
+        });
+        
+        // Observer resize for Terminal fit
+        new ResizeObserver(() => this.fit.fit()).observe(document.getElementById('panel-btm'));
+    },
+    
+    exec(input) {
+        const [cmd, ...args] = input.trim().split(' ');
+        
+        if(cmd === 'ls') {
+            const pathPrefix = this.cwd === '/' ? '' : this.cwd.substring(1) + '/'; 
+            const files = Object.keys(State.files).filter(f => f.startsWith(pathPrefix));
+            const distinct = new Set(files.map(f => {
+                const rest = f.substring(pathPrefix.length);
+                return rest.split('/')[0];
+            }));
+            this.instance.write(Array.from(distinct).join('  ') + '\r\n');
+        } 
+        else if (cmd === 'cd') {
+            const newDir = args[0];
+            if(newDir === '..') {
+                this.cwd = '/'; // Simple root reset for demo (complex logic skipped)
+            } else {
+                // Check simple folder existence existence via key check prefix
+                this.cwd = (this.cwd === '/' ? '/' : this.cwd + '/') + newDir;
+            }
+            this.instance.write('\r\n');
+        }
+        else if (cmd === 'clear') { this.instance.clear(); }
+        else if (cmd === 'python' && args[0]) {
+             // Mock command run (real python run handled by Runner)
+             this.instance.write(`Running python: ${args[0]}... Use 'Run' button for env integration.\r\n`);
+        }
+        else if (cmd === 'help') {
+            this.instance.write('Commands: ls, cd, cat, clear, node (mock), python (mock)\r\n');
+        }
+        else if (cmd === '') {} 
+        else { this.instance.write(`command not found: ${cmd}\r\n`); }
+        
+        this.instance.write(`\x1b[32muser@procode\x1b[0m:\x1b[34m${this.cwd}\x1b[0m$ `);
+    }
+};
+
+// 5. RUNNER (Bundler + Transpiler)
+const Runner = {
+    async exec() {
+        const frame = document.getElementById('preview-frame');
+        
+        // Check for Python main file
+        if (State.activeTab && State.activeTab.endsWith('.py')) {
+            this.runPython(State.activeTab);
+            return;
+        }
+
+        // --- WEB BUNDLING (React/HTML/JS) ---
+        Layout.toggleLayout('preview', true);
+        Layout.showConsole(); // Open console tab to see logs
+
+        const files = State.files;
+        let entry = files['index.html'] ? 'index.html' : Object.keys(files).find(f => f.endsWith('html'));
+
+        if (!entry) return Utils.toast("No index.html found", 'error');
+
+        // Transform Code Imports
+        // 1. Convert bare imports (import x from 'y') -> CDN
+        // 2. Convert relative imports (import x from './file') -> Blob URLs
+        const modules = {}; // Map of local path -> blob URL
+        
+        // Step 1: Process JS/JSX files into Blobs
+        for(let path of Object.keys(files)) {
+             if (path.match(/\.(js|jsx|ts|tsx)$/)) {
+                 let code = files[path];
+                 // If JSX/TS, transpile
+                 if (path.match(/\.(jsx|tsx)$/)) {
+                     try {
+                         code = Babel.transform(code, { presets: ['react', 'env'], filename: path }).code;
+                     } catch(e) { console.error(e); }
+                 }
+                 
+                 // Rewriter for ESM imports
+                 // A simple Regex approach. For prod, use Babel AST traverse.
+                 // Match: import ... from '...'
+                 code = code.replace(/import\s+(?:[\w*\s{},]+)\s+from\s+['"]([^'"]+)['"]/g, (match, specifier) => {
+                     // 1. Local Import
+                     if (specifier.startsWith('./') || specifier.startsWith('/')) {
+                         // Resolve path... (Simplified)
+                         const clean = specifier.replace(/^\.\//, '').replace(/^\//, '');
+                         // Note: In blob isolation, we can't really resolve relative URLs well 
+                         // without creating an object URL map beforehand. 
+                         // Advanced trick: Rewriting code inside Iframe hook. 
+                         // FOR NOW: Assume 'specifier' is mapped at run-time by Import Map.
+                         return match; 
+                     } 
+                     // 2. External Import
+                     else if(!specifier.startsWith('http')) {
+                         return match.replace(specifier, `https://esm.sh/${specifier}`);
+                     }
+                     return match;
+                 });
+
+                 modules[path] = code;
+             }
+        }
+
+        let html = files[entry];
+        
+        // Inject Virtual File System resolution via ImportMap + Hook
+        const importMap = { imports: {} };
+        const blobUrls = []; // Keep track to cleanup
+
+        // Create Blobs for Local Modules
+        for(let [path, code] of Object.entries(modules)) {
+            // Rewrite local imports in code
+             const relImports = [...code.matchAll(/from\s+['"]\.\/([^'"]+)['"]/g)];
+             // We need a complex topology sort to do this perfectly.
+             // Simplification: Since we use importmap, mapped names work!
+             const blob = new Blob([code], {type: 'text/javascript'});
+             const url = URL.createObjectURL(blob);
+             blobUrls.push(url);
+             
+             // Map ./main.js -> blob:...
+             importMap.imports[`./${path}`] = url;
+             importMap.imports[`/${path}`] = url;
+             // Try handling no extension
+             const noExt = path.replace(/\.[^/.]+$/, "");
+             importMap.imports[`./${noExt}`] = url;
+        }
+
+        // Script to intercept console and errors
+        const injector = `
+        <script>
+           // Capture Console
+           const _log = console.log; console.log = (...args) => { window.parent.postMessage({type:'log', args: args.map(String)}, '*'); _log(...args); };
+           window.onerror = (msg, url, line) => { window.parent.postMessage({type:'err', msg, line}, '*'); };
+        <\/script>
+        <script type="importmap">${JSON.stringify(importMap)}<\/script>
+        `;
+
+        // Inject
+        html = html.replace('<head>', '<head>' + injector);
+
+        // Render
+        frame.srcdoc = html;
+        
+        Utils.toast("Bundling & Running...");
+    },
+
+    async runPython(path) {
+        Layout.toggleLayout('terminal', true);
+        Term.instance.write(`\r\n\x1b[33m>>> Loading Pyodide...\x1b[0m\r\n`);
+        
+        // Initialize Pyodide if not already
+        if (!State.pyodide) {
+            try {
+                // Note: The CDN for Pyodide loads external resources. This works if CSP allow.
+                State.pyodide = await loadPyodide();
+            } catch (e) {
+                Term.instance.write(`\x1b[31mError loading Pyodide: ${e}\x1b[0m\r\n`);
+                return;
+            }
+        }
+        
+        Term.instance.write(`\x1b[33m>>> Executing ${path}...\x1b[0m\r\n`);
+        const code = State.files[path];
+        
+        // Redirect stdout
+        State.pyodide.setStdout({ batched: (str) => { Term.instance.write(str + '\r\n'); } });
+        
+        try {
+            await State.pyodide.runPythonAsync(code);
+        } catch(err) {
+            Term.instance.write(`\x1b[31m${err}\x1b[0m\r\n`);
+        }
+        Term.instance.write(`\x1b[32m>>> Finished.\x1b[0m\r\n$ `);
+    },
+
+    popout() {
+        const frame = document.getElementById('preview-frame');
+        const win = window.open('', '_blank');
+        win.document.write(frame.srcdoc);
+    }
+};
+
+// 6. LAYOUT MANAGER
+const Layout = {
+    setSide(id) {
+        document.querySelectorAll('.sidebar').forEach(s => s.classList.remove('active'));
+        const target = document.getElementById('side-'+id);
+        if(target) target.classList.add('active');
+        
+        document.querySelectorAll('.act-btn').forEach(b => b.classList.remove('active'));
+        document.querySelector(`.act-btn[data-id="${id}"]`).classList.add('active');
+        
+        // Hack: fix resize issue when sidebar toggles editor width
+        setTimeout(() => Editor.instance && Editor.instance.layout(), 100);
+    },
+    
+    toggleLayout(panel, forceShow = false) {
+        // Toggle Terminal or Preview
+        if(panel === 'preview') {
+            const el = document.getElementById('preview-wrap');
+            const handle = document.getElementById('rs-preview');
+            const isVisible = el.classList.contains('visible');
+            
+            if(!isVisible || forceShow) {
+                el.classList.add('visible');
+                handle.classList.remove('hidden');
+            } else {
+                el.classList.remove('visible');
+                handle.classList.add('hidden');
+            }
+        } 
+        else if (panel === 'terminal') {
+            const el = document.getElementById('panel-btm');
+            if (el.classList.contains('hidden') || forceShow) {
+                el.classList.remove('hidden');
+            } else {
+                el.classList.add('hidden');
+            }
+        }
+        setTimeout(() => { 
+            Editor.instance && Editor.instance.layout(); 
+            if(Term.fit) Term.fit.fit();
+        }, 300);
+    },
+    showConsole() {
+        this.toggleLayout('terminal', true);
+        Panel.show('console');
+    }
+};
+
+const Panel = {
+    show(id) {
+        document.querySelectorAll('#panel-body > div').forEach(d => d.classList.add('hidden'));
+        document.getElementById(id+'-host').classList.remove('hidden');
+        document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
+        event.target.classList.add('active'); // Dirty event usage but works for generated HTML
+        
+        if(id === 'term') Term.fit.fit();
+    }
+}
+
+// 7. AI SYSTEM (Mockup + Structure)
+const AI = {
+    visible: false,
+    toggle() {
+        const ui = document.getElementById('ai-float');
+        this.visible = !this.visible;
+        ui.style.display = this.visible ? 'flex' : 'none';
+        if(this.visible) document.getElementById('ai-input').focus();
+    },
+    send() {
+        const inp = document.getElementById('ai-input');
+        const txt = inp.value;
+        if(!txt) return;
+        
+        this.addMsg(txt, 'user');
+        inp.value = '';
+        
+        // Simulated Logic Response
+        setTimeout(() => {
+            let reply = "I can verify your syntax and logic.";
+            if (txt.includes('error') || txt.includes('debug')) {
+                reply = "I checked your code. You seem to be missing a semicolon in line 24. \n\nTry:\n`const x = 10;`";
+            } else if (txt.includes('create') && txt.includes('react')) {
+                reply = "Sure, here is a Functional Component:\n\n```jsx\nexport const Btn = () => <button>Click</button>\n```";
+            }
+            this.addMsg(reply, 'sys');
+        }, 1000);
+    },
+    addMsg(text, type) {
+        const c = document.getElementById('ai-messages');
+        const div = document.createElement('div');
+        
+        if (text.includes('```')) {
+             // Handle simple markdown code block
+             const parts = text.split('```');
+             let html = "";
+             parts.forEach((p, i) => {
+                 if (i % 2 === 0) html += `<div class="msg-bubble ${type=='user'?'msg-user':'msg-sys'}">${p}</div>`;
+                 else html += `<div class="code-block">${p.replace(/jsx|js|html/, '').trim()}</div>`;
+             });
+             div.innerHTML = html;
+             c.appendChild(div);
+        } else {
+             div.className = `msg-bubble ${type=='user'?'msg-user':'msg-sys'}`;
+             div.textContent = text;
+             c.appendChild(div);
+        }
+        c.scrollTop = c.scrollHeight;
+    }
+};
+
+// RESIZERS
+function initResizers() {
+    const makeResizer = (resizerId, targetId, direction, invert) => {
+        const resizer = document.getElementById(resizerId);
+        const target = document.getElementById(targetId);
+        
+        resizer.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            resizer.classList.add('dragging');
+            document.body.style.cursor = direction === 'w' ? 'col-resize' : 'row-resize';
+            
+            const startX = e.clientX;
+            const startY = e.clientY;
+            const startW = target.offsetWidth;
+            const startH = target.offsetHeight;
+            
+            const onMove = (e) => {
+                if (direction === 'w') {
+                    const diff = invert ? (startX - e.clientX) : (e.clientX - startX);
+                    target.style.width = (startW + diff) + 'px';
+                } else {
+                    const diff = invert ? (startY - e.clientY) : (e.clientY - startY);
+                    target.style.height = (startH - diff) + 'px';
+                }
+                if(Editor.instance) Editor.instance.layout();
+                if(Term.fit) Term.fit.fit();
+            };
+            
+            const onUp = () => {
+                window.removeEventListener('mousemove', onMove);
+                window.removeEventListener('mouseup', onUp);
+                resizer.classList.remove('dragging');
+                document.body.style.cursor = 'default';
+            };
+            
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('mouseup', onUp);
+        });
+    }
+    
+    makeResizer('rs-side', 'side-expl', 'w', false);
+    makeResizer('rs-panel', 'panel-btm', 'h', true); // Height grows upwards
+}
+
+// MESSAGE LISTENER (From Preview Iframe)
+window.addEventListener('message', (e) => {
+    if(e.data.type === 'log') {
+        const host = document.getElementById('console-host');
+        const l = document.createElement('div');
+        l.style = "border-bottom:1px solid #333; padding:4px 0; color:#e4e4e7;";
+        l.textContent = "> " + e.data.args.join(' ');
+        host.appendChild(l);
+        host.scrollTop = host.scrollHeight;
+    }
+});
+
+// INITIALIZATION SEQUENCE
+window.onload = async () => {
+    try {
+        await FS.init();
+        await Editor.init();
+        Term.init();
+        initResizers();
+        
+        // Auto-Open default
+        const entry = Object.keys(State.files)[0];
+        if(entry) Tabs.open(entry);
+        
+        // Drag Drop Handling
+        document.body.ondragover = e => e.preventDefault();
+        document.body.ondrop = e => { 
+            e.preventDefault(); 
+            // Simple file text drop
+            if(e.dataTransfer.items) {
+                 [...e.dataTransfer.items].forEach(async (item) => {
+                     if (item.kind === 'file') {
+                         const file = item.getAsFile();
+                         const text = await file.text();
+                         FS.write(file.name, text);
+                         FS.refreshTree();
+                         Utils.toast(`Dropped: ${file.name}`);
+                     }
+                 });
+            }
+        };
+        
+        Utils.toast("Ready for coding!");
+        
+    } catch(e) {
+        alert("Critial Init Error: " + e);
+    }
+};
+
+</script>
+</body>
+</html>
