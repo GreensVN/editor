@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pro Code IDE v14.0 - Ultimate Edition</title>
+    <title>Pro Code IDE v13.0 - Ultimate (Multi-Language)</title>
     
     <!-- FONTS -->
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     
     <!-- CORE ENGINE -->
@@ -16,7 +16,11 @@
     
     <!-- JS/TS COMPILERS -->
     <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
+    <script src="https://unpkg.com/typescript@5.4.5/lib/typescript.js"></script>
     
+    <!-- PYTHON ENGINE (Lazy Loaded via Script usually, but putting stub here) -->
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"></script>
+
     <!-- FORMATTERS -->
     <script src="https://unpkg.com/prettier@3.2.5/standalone.js"></script>
     <script src="https://unpkg.com/prettier@3.2.5/plugins/html.js"></script>
@@ -42,12 +46,7 @@
             --border: #27272a; --text: #e4e4e7; --text-dim: #71717a;
             --primary: #6366f1; --primary-hover: #4f46e5;
             --accent: #a855f7; --error: #ef4444; --success: #22c55e; --warn: #f59e0b;
-            --header-h: 44px; --footer-h: 26px; --act-bar-w: 50px; --side-w: 280px;
-        }
-
-        [data-theme="light"] {
-            --bg-dark: #ffffff; --bg-panel: #f8f9fa; --bg-side: #f1f3f5;
-            --border: #dee2e6; --text: #212529; --text-dim: #6c757d;
+            --header-h: 42px; --footer-h: 24px; --act-bar-w: 48px; --side-w: 260px;
         }
 
         /* CORE */
@@ -65,889 +64,184 @@
         ::-webkit-scrollbar-thumb:hover { background: #52525b; }
 
         .flex { display:flex; } .col { flex-direction:column; }
-        .ac { align-items:center; } .jc { justify-content:center; } .jb { justify-content:space-between; }
+        .ac { align-items:center; } .jb { justify-content:space-between; }
         .hidden { display:none !important; }
-        .gap-1 { gap:4px; } .gap-2 { gap:8px; } .gap-3 { gap:12px; }
         
         /* LAYOUT COMPONENTS */
         header { 
             height:var(--header-h); background:var(--bg-panel); border-bottom:1px solid var(--border);
             padding:0 12px; display:flex; align-items:center; gap: 12px; z-index: 50; flex-shrink: 0;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
         
-        .logo { 
-            font-weight:800; font-size:14px; letter-spacing:-0.5px; 
-            display:flex; align-items:center; gap:8px; color: #fff; 
-            cursor:pointer; transition: transform 0.2s;
-        }
-        .logo:hover { transform: scale(1.05); }
-        .logo span { 
-            background:linear-gradient(135deg, var(--primary), var(--accent)); 
-            -webkit-background-clip:text; color:transparent; font-size:16px; 
-        }
-        .logo .version {
-            font-size:9px; background:#4f46e5; color: white; 
-            padding:2px 6px; border-radius:4px; font-weight:600;
-        }
+        .logo { font-weight:800; font-size:14px; letter-spacing:-0.5px; display:flex; align-items:center; gap:8px; color: #fff; }
+        .logo span { background:linear-gradient(to right, var(--primary), var(--accent)); -webkit-background-clip:text; color:transparent; font-size:16px; }
 
         .btn {
-            background: transparent; color: #a1a1aa; border:1px solid transparent; 
-            padding:0 10px; border-radius:6px; cursor:pointer; font-size:13px; 
-            display:flex; align-items:center; gap:6px; transition:all 0.2s; 
-            height: 30px; font-weight:500;
+            background: transparent; color: #a1a1aa; border:1px solid transparent; padding:0 8px; border-radius:4px; 
+            cursor:pointer; font-size:13px; display:flex; align-items:center; gap:6px; transition:0.2s; height: 26px;
         }
-        .btn:hover { background: rgba(255,255,255,0.08); color:white; transform: translateY(-1px); }
-        .btn:active { transform: translateY(0); }
-        .btn.primary { 
-            background: linear-gradient(135deg, var(--primary), var(--primary-hover)); 
-            color:white; font-weight:600; padding:0 14px; 
-            border: 1px solid var(--primary-hover); 
-            box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
-        }
-        .btn.primary:hover { 
-            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4); 
-            transform: translateY(-2px);
-        }
-        .btn.success { background: var(--success); color:white; border-color: #16a34a; }
-        .btn.error { background: var(--error); color:white; border-color: #dc2626; }
+        .btn:hover { background: rgba(255,255,255,0.08); color:white; }
+        .btn:active { transform: translateY(1px); }
+        .btn.primary { background: var(--primary); color:white; font-weight:600; padding:0 12px; border: 1px solid var(--primary-hover); }
+        .btn.primary:hover { background: var(--primary-hover); box-shadow: 0 0 10px rgba(99, 102, 241, 0.4); }
         
         /* WORKSPACE */
         #workspace { flex:1; display:flex; overflow:hidden; position:relative; }
         
-        .act-bar { 
-            width:var(--act-bar-w); background:var(--bg-side); 
-            border-right:1px solid var(--border); display:flex; 
-            flex-direction:column; align-items:center; padding-top:12px; 
-            z-index:10; flex-shrink: 0;
-        }
-        .act-btn { 
-            width:42px; height:42px; display:flex; align-items:center; 
-            justify-content:center; color:#52525b; font-size:20px; 
-            cursor:pointer; margin-bottom:6px; transition:all 0.2s; 
-            position:relative; border-radius:10px;
-        }
-        .act-btn:hover { 
-            color:#a1a1aa; background: rgba(255,255,255,0.05); 
-            transform: scale(1.1);
-        }
-        .act-btn.active { 
-            color:#e4e4e7; background: rgba(99, 102, 241, 0.15); 
-            box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
-        }
-        .act-btn.active::before { 
-            content:''; position:absolute; left:0; top:12px; 
-            bottom:12px; width:3px; background:var(--primary); 
-            border-radius:0 4px 4px 0; 
-        }
-        .act-btn .badge {
-            position: absolute; top: 4px; right: 4px;
-            background: var(--error); color: white;
-            font-size: 9px; padding: 1px 4px;
-            border-radius: 8px; font-weight: 700;
-        }
+        .act-bar { width:var(--act-bar-w); background:var(--bg-side); border-right:1px solid var(--border); display:flex; flex-direction:column; align-items:center; padding-top:10px; z-index:10; flex-shrink: 0;}
+        .act-btn { width:40px; height:40px; display:flex; align-items:center; justify-content:center; color:#52525b; font-size:20px; cursor:pointer; margin-bottom:4px; transition:0.2s; position:relative; border-radius:8px;}
+        .act-btn:hover { color:#a1a1aa; background: rgba(255,255,255,0.05); }
+        .act-btn.active { color:#e4e4e7; background: rgba(255,255,255,0.08); }
+        .act-btn.active::before { content:''; position:absolute; left:0; top:10px; bottom:10px; width:3px; background:var(--primary); border-radius:0 4px 4px 0; }
 
-        .sidebar { 
-            width:var(--side-w); background:var(--bg-side); 
-            border-right:1px solid var(--border); display:none; 
-            flex-direction:column; 
-        }
+        .sidebar { width:var(--side-w); background:var(--bg-side); border-right:1px solid var(--border); display:none; flex-direction:column; }
         .sidebar.active { display:flex; }
-        .sb-head { 
-            height:38px; padding:0 14px; display:flex; 
-            align-items:center; justify-content:space-between; 
-            font-size:11px; font-weight:700; color:#a1a1aa; 
-            text-transform:uppercase; letter-spacing:0.5px; 
-            background: #161619; border-bottom:1px solid var(--border);
-        }
-        .sb-head .actions { display:flex; gap:8px; }
-        .sb-head .actions i { 
-            cursor:pointer; color:#71717a; transition:0.2s; 
-            padding:4px; border-radius:4px;
-        }
-        .sb-head .actions i:hover { color:#e4e4e7; background:#27272a; }
+        .sb-head { height:36px; padding:0 12px; display:flex; align-items:center; justify-content:space-between; font-size:11px; font-weight:700; color:#a1a1aa; text-transform:uppercase; letter-spacing:0.5px; background: #161619;}
         
         /* TREE VIEW */
-        .tree { flex:1; overflow-y:auto; padding:6px 0; }
-        .t-item { 
-            padding:5px 0; cursor:pointer; color:#a1a1aa; 
-            font-size:13px; display:flex; align-items:center; 
-            transition:all 0.15s; user-select: none; 
-            position: relative; border-radius:4px; margin:1px 4px;
-        }
+        .tree { flex:1; overflow-y:auto; padding:4px 0; }
+        .t-item { padding:4px 0; cursor:pointer; color:#a1a1aa; font-size:13px; display:flex; align-items:center; transition:0.1s; user-select: none; position: relative; }
         .t-item:hover { background:#2a2a2d; color:#e4e4e7; }
-        .t-item.active { 
-            background:linear-gradient(90deg, rgba(99, 102, 241, 0.15), transparent) !important; 
-            color:#fff; font-weight:500;
-        }
-        .t-item.active::before { 
-            content:''; position:absolute; left:0; top:0; 
-            bottom:0; width:2px; background:var(--primary); 
-            border-radius:0 4px 4px 0;
-        }
-        .t-indent { 
-            width:100%; display: flex; align-items: center; 
-            padding: 4px 8px; gap:8px;
-        }
-        .t-item .file-icon { width:18px; text-align:center; }
-        .t-item .file-name { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .t-folder { font-weight:600; }
+        .t-item.active { background:#37373d !important; color:#fff; }
+        .t-item.active::before { content:''; position:absolute; left:0; top:0; bottom:0; width:1px; background:var(--primary); }
+        .t-indent { width:100%; display: flex; align-items: center; padding: 3px 0; }
         
         /* EDITOR */
-        #main { 
-            flex:1; display:flex; flex-direction:column; 
-            min-width:0; background:var(--bg-dark); 
-            position:relative; overflow: hidden; 
-        }
-        .tabs { 
-            display:flex; background:var(--bg-panel); 
-            height:38px; overflow-x:auto; 
-            border-bottom:1px solid var(--border); 
-            scrollbar-width:thin; flex-shrink: 0; 
-        }
-        .tabs::-webkit-scrollbar { height:4px; }
-        .tab { 
-            display:flex; align-items:center; padding:0 14px; 
-            height:100%; border-right:1px solid #27272a; 
-            font-size:12px; color:#71717a; cursor:pointer; 
-            background: #18181b; min-width:140px; max-width:220px; 
-            gap: 8px; border-top: 2px solid transparent; 
-            transition: all 0.2s; position:relative;
-        }
-        .tab.active { 
-            background:var(--bg-dark); color:#e4e4e7; 
-            border-top-color:var(--primary); font-weight:500;
-        }
-        .tab.dirty::after {
-            content:''; position:absolute; top:12px; right:8px;
-            width:6px; height:6px; background:var(--primary);
-            border-radius:50%;
-        }
-        .tab .tab-name { 
-            flex:1; overflow:hidden; text-overflow:ellipsis; 
-            white-space:nowrap; 
-        }
-        .tab .close { 
-            width:18px; height:18px; display:flex; 
-            align-items:center; justify-content:center; 
-            border-radius:4px; opacity:0; transition:0.2s; 
-            font-size: 14px;
-        }
+        #main { flex:1; display:flex; flex-direction:column; min-width:0; background:var(--bg-dark); position:relative; overflow: hidden; }
+        .tabs { display:flex; background:var(--bg-panel); height:35px; overflow-x:auto; border-bottom:1px solid var(--border); scrollbar-width:none; flex-shrink: 0; }
+        .tab { display:flex; align-items:center; padding:0 12px; height:100%; border-right:1px solid #27272a; font-size:12px; color:#71717a; cursor:pointer; background: #18181b; min-width:120px; max-width:200px; gap: 8px; border-top: 2px solid transparent; transition: all 0.2s;}
+        .tab.active { background:var(--bg-dark); color:#e4e4e7; border-top-color:var(--primary); }
+        .tab .close { width:16px; height:16px; display:flex; align-items:center; justify-content:center; border-radius:4px; opacity:0; transition:0.2s; font-size: 14px;}
         .tab:hover .close { opacity:0.8; }
-        .tab .close:hover { 
-            background:#ef4444; color: white; opacity: 1;
-            transform: scale(1.1);
-        }
-        
-        .editor-breadcrumb {
-            height:28px; background:#0f0f11; border-bottom:1px solid var(--border);
-            display:flex; align-items:center; padding:0 12px;
-            font-size:11px; color:#71717a; gap:6px;
-        }
-        .editor-breadcrumb span { cursor:pointer; }
-        .editor-breadcrumb span:hover { color:#e4e4e7; text-decoration:underline; }
-        .editor-breadcrumb i { font-size:8px; }
+        .tab .close:hover { background:#ef4444; color: white; opacity: 1;}
         
         /* BOTTOM PANEL */
-        #panel-btm { 
-            height:220px; border-top:1px solid var(--border); 
-            background:var(--bg-panel); display:flex; 
-            flex-direction:column; position:absolute; 
-            bottom:0; left:0; right:0; z-index: 20; 
-            box-shadow: 0 -4px 10px rgba(0,0,0,0.2); 
-        }
-        .panel-tabs-bar {
-            height:32px; display:flex; align-items:center; 
-            background:var(--bg-panel); border-bottom:1px solid var(--border);
-            padding:0 8px; gap:4px;
-        }
-        .panel-tab { 
-            padding:0 12px; height:26px; display:flex; 
-            align-items:center; cursor:pointer; 
-            border-bottom:2px solid transparent; 
-            color: #71717a; font-size: 11px; 
-            font-weight: 600; letter-spacing: 0.5px; 
-            transition: 0.2s; border-radius:4px;
-            gap:6px;
-        }
-        .panel-tab:hover { color: #e4e4e7; background:rgba(255,255,255,0.05); }
-        .panel-tab.active { 
-            color:#e4e4e7; border-bottom-color:var(--primary); 
-            background:rgba(99, 102, 241, 0.1);
-        }
+        #panel-btm { height:200px; border-top:1px solid var(--border); background:var(--bg-panel); display:flex; flex-direction:column; position:absolute; bottom:0; left:0; right:0; z-index: 20; box-shadow: 0 -4px 10px rgba(0,0,0,0.2); }
+        .panel-tab { padding:0 12px; height:100%; display:flex; align-items:center; cursor:pointer; border-bottom:1px solid transparent; color: #71717a; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; transition: 0.2s; }
+        .panel-tab:hover { color: #e4e4e7; }
+        .panel-tab.active { color:#e4e4e7; border-bottom-color:var(--primary); }
 
         /* PREVIEW */
-        #preview-wrap { 
-            width:0; background:white; display:flex; 
-            flex-direction:column; border-left:1px solid var(--border); 
-            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
-            position:relative; z-index: 15; 
-        }
+        #preview-wrap { width:0; background:white; display:flex; flex-direction:column; border-left:1px solid var(--border); transition: width 0.1s; position:relative; z-index: 15; }
         #preview-wrap.visible { width: 50%; }
         
-        .url-bar {
-            height:34px; background:#f4f4f5; 
-            padding:0 10px; border-bottom:1px solid #ddd;
-            display:flex; align-items:center; justify-content:space-between;
-        }
-        .url-bar input {
-            flex:1; background:#fff; border:1px solid #ddd;
-            padding:4px 8px; border-radius:4px; font-size:12px;
-            margin:0 8px;
-        }
-        
-        /* SPLIT VIEW */
-        .split-container { display:flex; height:100%; position:relative; }
-        .split-pane { flex:1; position:relative; }
-        .split-divider {
-            width:4px; background:var(--border); cursor:col-resize;
-            transition:background 0.2s; z-index:10;
-        }
-        .split-divider:hover { background:var(--primary); }
-        
         /* HELPERS & UTILS */
-        .resizer { 
-            position:absolute; z-index:99; background:transparent; 
-            transition: background 0.2s; 
-        }
-        .resizer:hover, .resizer.dragging { 
-            background:var(--primary); transition-delay: 0.2s; 
-        }
+        .resizer { position:absolute; z-index:99; background:transparent; transition: background 0.2s; }
+        .resizer:hover, .resizer.dragging { background:var(--primary); transition-delay: 0.2s; }
         .r-w { width:4px; height:100%; cursor:col-resize; top:0; }
         .r-h { width:100%; height:4px; cursor:row-resize; top:0; left:0; }
 
-        .image-viewer { 
-            flex:1; display:flex; align-items:center; 
-            justify-content:center; 
-            background:repeating-conic-gradient(#18181b 0% 25%, #27272a 0% 50%) 50% / 20px 20px; 
-            overflow:auto; padding:20px; 
-        }
-        .image-viewer img { 
-            max-width:100%; max-height:100%; 
-            box-shadow:0 0 30px rgba(0,0,0,0.5); 
-            border-radius:4px;
-        }
+        .image-viewer { flex:1; display:flex; align-items:center; justify-content:center; background:repeating-conic-gradient(#18181b 0% 25%, #27272a 0% 50%) 50% / 20px 20px; overflow:auto; padding:20px; }
+        .image-viewer img { max-width:100%; box-shadow:0 0 20px rgba(0,0,0,0.5); }
 
         /* FOOTER */
-        footer { 
-            height:var(--footer-h); background:var(--primary); 
-            color:white; display:flex; align-items:center; 
-            padding:0 12px; font-size:11px; 
-            justify-content:space-between; flex-shrink: 0; 
-            z-index: 55; box-shadow: 0 -1px 3px rgba(0,0,0,0.1);
-        }
-        .f-stat { display:flex; gap:12px; font-weight:500; align-items:center; }
-        .f-stat span { cursor: pointer; opacity: 0.9; transition:0.2s; }
-        .f-stat span:hover { opacity: 1; text-decoration: underline;}
-        .f-icon { opacity:0.8; margin-right:4px; }
+        footer { height:var(--footer-h); background:var(--primary); color:white; display:flex; align-items:center; padding:0 12px; font-size:11px; justify-content:space-between; flex-shrink: 0; z-index: 55; }
+        .f-stat { display:flex; gap:12px; font-weight:500; }
+        .f-stat span { cursor: pointer; opacity: 0.9; } .f-stat span:hover { opacity: 1; text-decoration: underline;}
 
         /* MODALS & LOADERS */
-        #loader-overlay { 
-            position:fixed; inset:0; background:#09090b; 
-            z-index:10000; display:flex; flex-direction:column; 
-            justify-content:center; align-items:center; 
-        }
-        .spinner { 
-            width: 50px; height: 50px; 
-            border: 4px solid rgba(255,255,255,0.1); 
-            border-radius: 50%; border-top-color: var(--primary); 
-            animation: spin 0.8s ease-in-out infinite; 
-        }
+        #loader-overlay { position:fixed; inset:0; background:#09090b; z-index:10000; display:flex; flex-direction:column; justify-content:center; align-items:center; }
+        .spinner { width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.1); border-radius: 50%; border-top-color: var(--primary); animation: spin 0.8s ease-in-out infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
-        
-        .boot-logo {
-            font-size:48px; margin-bottom:30px;
-            background:linear-gradient(135deg, var(--primary), var(--accent));
-            -webkit-background-clip:text; color:transparent;
-            animation:pulse 2s infinite;
-        }
-        @keyframes pulse { 
-            0%, 100% { opacity:1; transform:scale(1); } 
-            50% { opacity:0.8; transform:scale(1.05); } 
-        }
-
-        /* MODAL */
-        .modal-overlay {
-            position:fixed; inset:0; background:rgba(0,0,0,0.7);
-            z-index:9000; display:none; align-items:center;
-            justify-content:center; backdrop-filter:blur(4px);
-        }
-        .modal-overlay.active { display:flex; }
-        .modal {
-            background:var(--bg-panel); border:1px solid var(--border);
-            border-radius:12px; min-width:400px; max-width:600px;
-            box-shadow:0 20px 60px rgba(0,0,0,0.5);
-            animation:modalIn 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
-        }
-        @keyframes modalIn { 
-            from { transform: translateY(-20px) scale(0.95); opacity: 0; } 
-            to { transform: translateY(0) scale(1); opacity: 1; } 
-        }
-        .modal-header {
-            padding:16px 20px; border-bottom:1px solid var(--border);
-            display:flex; align-items:center; justify-content:space-between;
-            font-weight:700; font-size:14px;
-        }
-        .modal-body { padding:20px; max-height:70vh; overflow-y:auto; }
-        .modal-footer {
-            padding:16px 20px; border-top:1px solid var(--border);
-            display:flex; gap:8px; justify-content:flex-end;
-        }
-        
-        .form-group { margin-bottom:16px; }
-        .form-group label { 
-            display:block; font-size:12px; font-weight:600; 
-            color:#a1a1aa; margin-bottom:6px; 
-        }
-        .form-group input, .form-group select, .form-group textarea {
-            width:100%; background:#0f0f11; border:1px solid var(--border);
-            color:var(--text); padding:8px 12px; border-radius:6px;
-            font-size:13px; font-family:inherit;
-        }
-        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
-            border-color:var(--primary); box-shadow:0 0 0 3px rgba(99, 102, 241, 0.1);
-        }
-
-        /* COMMAND PALETTE */
-        #cmd-palette {
-            position:fixed; top:100px; left:50%; transform:translateX(-50%);
-            width:600px; background:var(--bg-panel); border:1px solid var(--border);
-            border-radius:12px; z-index:9500; display:none;
-            box-shadow:0 20px 60px rgba(0,0,0,0.5);
-        }
-        #cmd-palette.active { display:block; animation:modalIn 0.2s; }
-        #cmd-palette input {
-            width:100%; background:transparent; border:none;
-            color:var(--text); padding:16px 20px; font-size:14px;
-            border-bottom:1px solid var(--border);
-        }
-        .cmd-list {
-            max-height:400px; overflow-y:auto;
-        }
-        .cmd-item {
-            padding:12px 20px; cursor:pointer; display:flex;
-            align-items:center; gap:12px; font-size:13px;
-            transition:0.1s; border-bottom:1px solid #1a1a1d;
-        }
-        .cmd-item:hover, .cmd-item.selected {
-            background:rgba(99, 102, 241, 0.15);
-        }
-        .cmd-item i { width:20px; text-align:center; color:var(--primary); }
-        .cmd-item .cmd-name { flex:1; font-weight:500; }
-        .cmd-item .cmd-key {
-            font-size:11px; background:#27272a; padding:2px 6px;
-            border-radius:4px; color:#71717a;
-        }
-
-        /* CONTEXT MENU */
-        .context-menu {
-            position:fixed; background:#27272a; border:1px solid #333;
-            padding:4px; border-radius:8px; z-index:9999;
-            min-width:180px; box-shadow:0 8px 24px rgba(0,0,0,0.4);
-            animation:menuIn 0.15s;
-        }
-        @keyframes menuIn { from { opacity:0; transform:scale(0.95); } }
-        .ctx-item {
-            padding:8px 12px; font-size:12px; cursor:pointer;
-            color:#eee; border-radius:5px; display:flex;
-            align-items:center; gap:10px; transition:0.1s;
-        }
-        .ctx-item:hover { background:var(--primary); }
-        .ctx-item i { width:16px; text-align:center; }
-        .ctx-divider {
-            height:1px; background:#3f3f46; margin:4px 0;
-        }
-
-        /* SETTINGS PANEL */
-        .settings-panel {
-            padding:20px;
-        }
-        .setting-section {
-            margin-bottom:24px;
-        }
-        .setting-section h3 {
-            font-size:13px; font-weight:700; color:#a1a1aa;
-            text-transform:uppercase; letter-spacing:0.5px;
-            margin-bottom:12px; padding-bottom:8px;
-            border-bottom:1px solid var(--border);
-        }
-        .setting-row {
-            display:flex; align-items:center; justify-content:space-between;
-            padding:10px 0; border-bottom:1px solid #1a1a1d;
-        }
-        .setting-row:last-child { border:none; }
-        .setting-label {
-            font-size:13px; font-weight:500;
-        }
-        .setting-desc {
-            font-size:11px; color:#71717a; margin-top:2px;
-        }
-        .toggle-switch {
-            position:relative; width:44px; height:24px;
-            background:#3f3f46; border-radius:12px;
-            cursor:pointer; transition:0.3s;
-        }
-        .toggle-switch.active { background:var(--primary); }
-        .toggle-switch::after {
-            content:''; position:absolute; top:2px; left:2px;
-            width:20px; height:20px; background:white;
-            border-radius:50%; transition:0.3s;
-        }
-        .toggle-switch.active::after { left:22px; }
-
-        /* SEARCH PANEL */
-        .search-panel {
-            padding:12px;
-        }
-        .search-input-group {
-            display:flex; flex-direction:column; gap:8px;
-            margin-bottom:12px;
-        }
-        .search-input-wrapper {
-            display:flex; gap:6px;
-        }
-        .search-input-wrapper input {
-            flex:1; background:#0f0f11; border:1px solid var(--border);
-            color:var(--text); padding:8px 12px; border-radius:6px;
-            font-size:12px;
-        }
-        .search-options {
-            display:flex; gap:8px; padding:4px 0;
-        }
-        .search-option {
-            padding:4px 10px; background:#27272a; border-radius:4px;
-            font-size:11px; cursor:pointer; transition:0.2s;
-            border:1px solid transparent;
-        }
-        .search-option.active {
-            background:rgba(99, 102, 241, 0.2);
-            border-color:var(--primary);
-        }
-        .search-results {
-            flex:1; overflow-y:auto; font-size:12px;
-        }
-        .search-result-item {
-            padding:8px 12px; cursor:pointer; transition:0.1s;
-            border-bottom:1px solid #1a1a1d;
-        }
-        .search-result-item:hover {
-            background:rgba(99, 102, 241, 0.1);
-        }
-        .search-result-file {
-            font-weight:600; color:#a1a1aa; margin-bottom:4px;
-        }
-        .search-result-line {
-            color:#71717a; font-family:'JetBrains Mono';
-            white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-        }
-        .search-match {
-            background:rgba(99, 102, 241, 0.3);
-            color:white; padding:2px 4px; border-radius:2px;
-        }
-
-        /* CONSOLE STYLES */
-        .console-line {
-            border-bottom:1px solid #1a1a1d;
-            padding:6px 10px; font-family:'JetBrains Mono';
-            font-size:12px; display:flex; gap:8px;
-        }
-        .console-line.log { color:#e4e4e7; }
-        .console-line.error { color:#ef4444; background:rgba(239, 68, 68, 0.1); }
-        .console-line.warn { color:#f59e0b; background:rgba(245, 158, 11, 0.1); }
-        .console-line .icon { opacity:0.6; width:16px; }
-
-        /* FLOATING WIDGETS */
-        .float-widget {
-            position:absolute; right:20px; bottom:20px;
-            background:#18181b; border:1px solid #333;
-            border-radius:12px; z-index:100;
-            box-shadow:0 20px 50px rgba(0,0,0,0.5);
-            animation: popUp 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
-        }
-        @keyframes popUp { 
-            from { transform: translateY(20px) scale(0.95); opacity: 0; } 
-            to { transform: translateY(0) scale(1); opacity: 1; } 
-        }
 
         /* AI CHAT */
-        #ai-float {
-            width:420px; height:600px; display:none; flex-direction:column;
-        }
-        .ai-header {
-            padding:14px 16px; border-bottom:1px solid #333;
-            background:#1f1f22; border-radius:12px 12px 0 0;
-            display:flex; align-items:center; justify-content:space-between;
-            cursor:move;
-        }
-        .ai-title {
-            font-weight:700; color:var(--primary);
-            display:flex; align-items:center; gap:8px;
-        }
-        .ai-messages {
-            flex:1; overflow-y:auto; padding:16px;
-            display:flex; flex-direction:column; gap:12px;
-        }
-        .msg-bubble {
-            background: #27272a; padding: 10px 14px;
-            border-radius: 12px; max-width: 85%;
-            font-size: 13px; line-height: 1.5;
-            box-shadow:0 2px 8px rgba(0,0,0,0.2);
-        }
-        .msg-user {
-            background: linear-gradient(135deg, var(--primary), var(--primary-hover));
-            color: white; align-self: flex-end;
-            border-radius: 12px 12px 2px 12px;
-        }
-        .msg-sys {
-            color: #e4e4e7; border: 1px solid #333;
-            border-radius: 12px 12px 12px 2px;
-        }
-        .code-block {
-            background: #0f0f11; padding: 10px 12px;
-            border-radius: 6px; font-family: 'JetBrains Mono';
-            margin-top: 8px; white-space: pre-wrap;
-            font-size: 11px; overflow-x: auto;
-            border: 1px solid #333;
-        }
-        .ai-input-wrapper {
-            padding:12px; border-top:1px solid #333;
-            background:#18181b; border-radius:0 0 12px 12px;
-            display:flex; gap:8px;
-        }
-        .ai-input-wrapper input {
-            flex:1; background:#0f0f11; border:1px solid #333;
-            color:white; padding:10px 14px; border-radius:8px;
-            font-size:13px;
-        }
-        .ai-input-wrapper button {
-            padding:0 16px; background:var(--primary);
-            color:white; border:none; border-radius:8px;
-            cursor:pointer; font-weight:600;
-            transition:0.2s;
-        }
-        .ai-input-wrapper button:hover {
-            background:var(--primary-hover);
-            transform:scale(1.05);
-        }
-
-        /* ANIMATIONS */
-        @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
-        @keyframes slideUp { from { transform:translateY(10px); opacity:0; } }
-        
-        /* UTILITY CLASSES */
-        .text-xs { font-size:11px; }
-        .text-sm { font-size:12px; }
-        .text-md { font-size:13px; }
-        .text-lg { font-size:14px; }
-        .font-bold { font-weight:700; }
-        .font-semibold { font-weight:600; }
-        .opacity-50 { opacity:0.5; }
-        .opacity-70 { opacity:0.7; }
-        
-        /* RESPONSIVE */
-        @media (max-width: 768px) {
-            :root { --side-w: 240px; --act-bar-w: 44px; }
-            .btn { font-size:11px; padding:0 8px; height:26px; }
-            #ai-float { width:calc(100% - 40px); height:calc(100% - 100px); }
-        }
+        #ai-float { position:absolute; right:20px; bottom:20px; width:400px; height:600px; background:#18181b; border:1px solid #333; z-index:100; border-radius:12px; display:none; flex-direction:column; box-shadow:0 20px 50px rgba(0,0,0,0.5); animation: popUp 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28); }
+        @keyframes popUp { from { transform: translateY(20px) scale(0.95); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
+        .msg-bubble { background: #27272a; padding: 8px 12px; border-radius: 8px; margin-bottom: 8px; font-size: 13px; max-width: 90%; line-height: 1.4; }
+        .msg-user { background: var(--primary); color: white; align-self: flex-end; }
+        .msg-sys { color: #a1a1aa; border: 1px solid #333; }
+        .code-block { background: #111; padding: 8px; border-radius: 4px; font-family: 'JetBrains Mono'; margin-top: 5px; white-space: pre-wrap; font-size: 11px; overflow-x: auto; border: 1px solid #333;}
     </style>
 </head>
 <body>
 
 <!-- BOOT SCREEN -->
 <div id="loader-overlay">
-    <div class="boot-logo"><i class="fas fa-code"></i></div>
-    <div class="logo" style="margin-bottom:20px; font-size: 24px;">
-        <span>PRO CODE</span> IDE
-    </div>
+    <div class="logo" style="margin-bottom:20px; font-size: 24px;"><i class="fas fa-code"></i> PRO CODE <span>IDE</span></div>
     <div class="spinner"></div>
-    <div id="boot-status" style="margin-top:20px; font-family:'JetBrains Mono'; font-size:12px; color:#71717a; text-align:center;">
-        INITIALIZING KERNEL...
-    </div>
+    <div id="boot-status" style="margin-top:15px; font-family:'JetBrains Mono'; font-size:12px; color:#71717a">INITIALIZING KERNEL...</div>
 </div>
 
-<!-- HEADER -->
 <header>
-    <div class="logo" onclick="UI.showAbout()">
-        <i class="fas fa-layer-group" style="color:var(--primary)"></i> 
-        PRO <span>CODE</span> 
-        <span class="version">v14.0</span>
+    <div class="logo"><i class="fas fa-layer-group" style="color:var(--primary)"></i> PRO <span>CODE</span> <span style="font-size:10px; background:#4f46e5; color: white; padding:2px 6px; border-radius:4px">v13.0</span></div>
+    
+    <div style="width: 1px; height: 16px; background: #333;"></div>
+    
+    <button class="btn" onclick="Command.trigger('save')" title="Save (Ctrl+S)"><i class="fas fa-save"></i></button>
+    <button class="btn" onclick="FS.exportZip()" title="Download Project"><i class="fas fa-download"></i></button>
+    <button class="btn" onclick="FS.importPrompt()" title="Import"><i class="fas fa-folder-open"></i></button>
+    
+    <div style="flex:1"></div>
+    
+    <div style="background: #27272a; border-radius: 6px; display:flex; align-items:center; padding: 4px 10px; gap: 8px; border: 1px solid #3f3f46;">
+        <i class="fas fa-search" style="font-size: 11px; color: #71717a;"></i>
+        <input id="spotlight" placeholder="Command Palette (Ctrl+P)" style="background:transparent; border:none; color:white; font-size: 12px; width: 200px;">
     </div>
-    
-    <div style="width: 1px; height: 20px; background: #333;"></div>
-    
-    <button class="btn" onclick="Command.run('save')" title="Save (Ctrl+S)">
-        <i class="fas fa-save"></i>
-    </button>
-    <button class="btn" onclick="FS.exportZip()" title="Export Project">
-        <i class="fas fa-download"></i> Export
-    </button>
-    <button class="btn" onclick="FS.importPrompt()" title="Import Files">
-        <i class="fas fa-folder-open"></i>
-    </button>
-    
-    <div style="flex:1"></div>
-    
-    <button class="btn" onclick="UI.showCommandPalette()" title="Command Palette (Ctrl+Shift+P)">
-        <i class="fas fa-search"></i> Commands
-    </button>
 
     <div style="flex:1"></div>
 
-    <button class="btn" onclick="Layout.toggleLayout('terminal')" title="Terminal (Ctrl+`)">
-        <i class="fas fa-terminal"></i>
-    </button>
-    <button class="btn" onclick="Layout.toggleLayout('preview')" title="Preview (Ctrl+B)">
-        <i class="fas fa-eye"></i> Preview
-    </button>
-    <button class="btn" onclick="Editor.format()" title="Format Code (Shift+Alt+F)">
-        <i class="fas fa-magic"></i>
-    </button>
-    <button class="btn primary" onclick="Runner.exec()" title="Run (F5)">
-        <i class="fas fa-play"></i> RUN
-    </button>
+    <button class="btn" onclick="Layout.toggleLayout('terminal')" title="Terminal (Ctrl+`)"><i class="fas fa-terminal"></i></button>
+    <button class="btn" onclick="Layout.toggleLayout('preview')" title="Preview (Ctrl+B)"><i class="fas fa-columns"></i></button>
+    <button class="btn primary" onclick="Runner.exec()" title="Run (F5)"> <i class="fas fa-play"></i> RUN</button>
 </header>
 
-<!-- WORKSPACE -->
 <div id="workspace">
     <!-- Activity Bar -->
     <div class="act-bar">
-        <div class="act-btn active" data-id="expl" onclick="Layout.setSide('expl')" title="Explorer">
-            <i class="far fa-folder-open"></i>
-        </div>
-        <div class="act-btn" data-id="search" onclick="Layout.setSide('search')" title="Search">
-            <i class="fas fa-search"></i>
-        </div>
-        <div class="act-btn" data-id="git" onclick="Layout.setSide('git')" title="Source Control">
-            <i class="fas fa-code-branch"></i>
-        </div>
-        <div class="act-btn" data-id="ext" onclick="Layout.setSide('ext')" title="Extensions">
-            <i class="fas fa-puzzle-piece"></i>
-        </div>
+        <div class="act-btn active" data-id="expl" onclick="Layout.setSide('expl')"><i class="far fa-copy"></i></div>
+        <div class="act-btn" data-id="search" onclick="Layout.setSide('search')"><i class="fas fa-search"></i></div>
+        <div class="act-btn" data-id="git" onclick="Layout.setSide('git')"><i class="fas fa-code-branch"></i></div>
+        <div class="act-btn" data-id="ext" onclick="Layout.setSide('ext')"><i class="fas fa-cubes"></i></div>
         <div style="flex:1"></div>
-        <div class="act-btn" onclick="Layout.setSide('set')" title="Settings">
-            <i class="fas fa-cog"></i>
-        </div>
-        <div class="act-btn" onclick="AI.toggle()" style="color: #a855f7" title="AI Assistant">
-            <i class="fas fa-robot"></i>
-        </div>
+        <div class="act-btn" onclick="Layout.setSide('set')"><i class="fas fa-cog"></i></div>
+        <div class="act-btn" onclick="AI.toggle()" style="color: #a855f7"><i class="fas fa-robot"></i></div>
     </div>
 
     <!-- Explorer Sidebar -->
     <div id="side-expl" class="sidebar active">
         <div class="sb-head">
-            <span><i class="fas fa-folder f-icon"></i> PROJECT</span>
-            <div class="actions">
-                <i class="fas fa-file-medical" onclick="FS.createFilePrompt()" title="New File"></i>
-                <i class="fas fa-folder-plus" onclick="FS.createFolderPrompt()" title="New Folder"></i>
-                <i class="fas fa-sync-alt" onclick="FS.refreshTree()" title="Refresh"></i>
+            <span>Project</span>
+            <div class="flex gap-2">
+                <i class="fas fa-file-medical" onclick="FS.createFilePrompt()" title="New File" style="cursor:pointer; margin-right:5px"></i>
+                <i class="fas fa-folder-plus" onclick="FS.createFolderPrompt()" title="New Folder" style="cursor:pointer"></i>
             </div>
         </div>
         <div id="file-tree" class="tree"></div>
     </div>
     
-    <!-- Search Sidebar -->
-    <div id="side-search" class="sidebar">
-        <div class="sb-head">
-            <span><i class="fas fa-search f-icon"></i> SEARCH</span>
-        </div>
-        <div class="search-panel">
-            <div class="search-input-group">
-                <div class="search-input-wrapper">
-                    <input id="search-input" placeholder="Search..." onkeyup="Search.perform()">
-                    <button class="btn" onclick="Search.perform()"><i class="fas fa-search"></i></button>
-                </div>
-                <div class="search-input-wrapper">
-                    <input id="replace-input" placeholder="Replace...">
-                    <button class="btn" onclick="Search.replace()"><i class="fas fa-exchange-alt"></i></button>
-                </div>
-            </div>
-            <div class="search-options">
-                <div class="search-option" onclick="Search.toggleOption('case')" data-option="case">
-                    <i class="fas fa-font"></i> Aa
-                </div>
-                <div class="search-option" onclick="Search.toggleOption('word')" data-option="word">
-                    <i class="fas fa-quote-right"></i> Word
-                </div>
-                <div class="search-option" onclick="Search.toggleOption('regex')" data-option="regex">
-                    <i class="fas fa-asterisk"></i> .*
-                </div>
-            </div>
-            <div id="search-results" class="search-results"></div>
-        </div>
-    </div>
-    
-    <!-- Git Sidebar -->
-    <div id="side-git" class="sidebar">
-        <div class="sb-head">
-            <span><i class="fas fa-code-branch f-icon"></i> SOURCE CONTROL</span>
-        </div>
-        <div style="padding:20px; color:#71717a; text-align:center;">
-            <i class="fas fa-check-circle" style="font-size:48px; margin-bottom:12px; color:#22c55e;"></i>
-            <div style="font-size:13px; margin-bottom:8px;">No changes detected</div>
-            <div style="font-size:11px;">All files are synchronized</div>
-        </div>
-    </div>
-
-    <!-- Extensions Sidebar -->
-    <div id="side-ext" class="sidebar">
-        <div class="sb-head">
-            <span><i class="fas fa-puzzle-piece f-icon"></i> EXTENSIONS</span>
-        </div>
-        <div style="padding:16px;">
-            <div style="background:#27272a; padding:12px; border-radius:8px; margin-bottom:12px; cursor:pointer; transition:0.2s;" onmouseenter="this.style.background='#2a2a2d'" onmouseleave="this.style.background='#27272a'">
-                <div style="font-weight:600; font-size:13px; margin-bottom:4px;">
-                    <i class="fas fa-code" style="color:var(--primary)"></i> Code Formatter
-                </div>
-                <div style="font-size:11px; color:#71717a;">Prettier integration for code formatting</div>
-                <div style="margin-top:8px;"><span style="background:#22c55e; padding:2px 8px; border-radius:4px; font-size:10px; color:white;">INSTALLED</span></div>
-            </div>
-            <div style="background:#27272a; padding:12px; border-radius:8px; margin-bottom:12px;">
-                <div style="font-weight:600; font-size:13px; margin-bottom:4px;">
-                    <i class="fab fa-python" style="color:#3b82f6"></i> Python Runtime
-                </div>
-                <div style="font-size:11px; color:#71717a;">Execute Python code in browser</div>
-                <div style="margin-top:8px;"><span style="background:#22c55e; padding:2px 8px; border-radius:4px; font-size:10px; color:white;">ACTIVE</span></div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Settings Sidebar -->
-    <div id="side-set" class="sidebar">
-        <div class="sb-head">
-            <span><i class="fas fa-cog f-icon"></i> SETTINGS</span>
-        </div>
-        <div class="settings-panel">
-            <div class="setting-section">
-                <h3>Appearance</h3>
-                <div class="setting-row">
-                    <div>
-                        <div class="setting-label">Dark Theme</div>
-                        <div class="setting-desc">Use dark color scheme</div>
-                    </div>
-                    <div class="toggle-switch active" onclick="Settings.toggle('theme', this)"></div>
-                </div>
-                <div class="setting-row">
-                    <div>
-                        <div class="setting-label">Font Size</div>
-                        <div class="setting-desc">Editor font size</div>
-                    </div>
-                    <select onchange="Settings.setFontSize(this.value)" style="background:#27272a; color:white; border:1px solid #333; padding:4px 8px; border-radius:4px;">
-                        <option value="12">12px</option>
-                        <option value="13">13px</option>
-                        <option value="14" selected>14px</option>
-                        <option value="16">16px</option>
-                        <option value="18">18px</option>
-                    </select>
-                </div>
-            </div>
-            <div class="setting-section">
-                <h3>Editor</h3>
-                <div class="setting-row">
-                    <div>
-                        <div class="setting-label">Minimap</div>
-                        <div class="setting-desc">Show code minimap</div>
-                    </div>
-                    <div class="toggle-switch active" onclick="Settings.toggle('minimap', this)"></div>
-                </div>
-                <div class="setting-row">
-                    <div>
-                        <div class="setting-label">Auto Save</div>
-                        <div class="setting-desc">Save files automatically</div>
-                    </div>
-                    <div class="toggle-switch active" onclick="Settings.toggle('autosave', this)"></div>
-                </div>
-                <div class="setting-row">
-                    <div>
-                        <div class="setting-label">Word Wrap</div>
-                        <div class="setting-desc">Wrap long lines</div>
-                    </div>
-                    <div class="toggle-switch" onclick="Settings.toggle('wordwrap', this)"></div>
-                </div>
-            </div>
-            <div class="setting-section">
-                <h3>Terminal</h3>
-                <div class="setting-row">
-                    <div>
-                        <div class="setting-label">Font Size</div>
-                        <div class="setting-desc">Terminal font size</div>
-                    </div>
-                    <select onchange="Settings.setTerminalFontSize(this.value)" style="background:#27272a; color:white; border:1px solid #333; padding:4px 8px; border-radius:4px;">
-                        <option value="11">11px</option>
-                        <option value="12">12px</option>
-                        <option value="13" selected>13px</option>
-                        <option value="14">14px</option>
-                    </select>
-                </div>
-            </div>
-        </div>
-    </div>
+    <!-- Other Sidebars (Hidden primarily) -->
+    <div id="side-search" class="sidebar"><div class="sb-head"><span>Search</span></div><div style="padding:10px"><input placeholder="Search..." class="btn" style="width:100%; text-align:left; background:#27272a;"></div></div>
+    <div id="side-git" class="sidebar"><div class="sb-head"><span>Source Control</span></div><div style="padding:10px; color:#71717a; text-align:center; font-size:12px;">Changes synced<br>Git Graph Ready</div></div>
 
     <div class="resizer r-w" id="rs-side" style="right:0"></div>
 
     <!-- Main Editor Area -->
     <div id="main">
         <div class="tabs" id="tab-list"></div>
-        <div class="editor-breadcrumb" id="breadcrumb" style="display:none;">
-            <i class="fas fa-folder"></i>
-            <span>project</span>
-            <i class="fas fa-chevron-right"></i>
-            <span id="breadcrumb-path"></span>
-        </div>
+        <!-- Monaco Mount -->
         <div id="editor-container" style="flex:1; position:relative;">
              <div id="monaco-root" style="width:100%; height:100%;"></div>
              <div id="empty-state" style="position:absolute; inset:0; display:flex; flex-direction:column; justify-content:center; align-items:center; background:var(--bg-dark);">
-                <i class="fab fa-connectdevelop" style="font-size:72px; color:#27272a; margin-bottom:20px;"></i>
-                <div style="color:#71717a; font-size:16px; margin-bottom:8px; font-weight:600;">Welcome to Pro Code IDE</div>
-                <div style="color:#52525b; font-size:13px; margin-bottom:20px;">Open a file or create a new project to get started</div>
-                <div style="display:flex; gap:12px;">
-                    <button class="btn primary" onclick="FS.createFilePrompt()">
-                        <i class="fas fa-file"></i> New File
-                    </button>
-                    <button class="btn" onclick="FS.importPrompt()">
-                        <i class="fas fa-folder-open"></i> Open Project
-                    </button>
-                </div>
+                <i class="fab fa-connectdevelop" style="font-size:64px; color:#27272a; margin-bottom:16px;"></i>
+                <div style="color:#52525b">Open a file or Create new project</div>
              </div>
         </div>
 
         <!-- Terminal Panel -->
         <div id="panel-btm" class="hidden">
             <div class="resizer r-h" id="rs-panel" style="cursor: row-resize;"></div>
-            <div class="panel-tabs-bar">
-                <div class="panel-tab active" onclick="Panel.show('term')">
-                    <i class="fas fa-terminal"></i> TERMINAL
-                </div>
-                <div class="panel-tab" onclick="Panel.show('console')">
-                    <i class="fas fa-bug"></i> CONSOLE
-                </div>
-                <div class="panel-tab" onclick="Panel.show('problems')">
-                    <i class="fas fa-exclamation-triangle"></i> PROBLEMS
-                    <span id="problems-count" style="background:#ef4444; padding:2px 6px; border-radius:8px; font-size:10px; margin-left:4px;">0</span>
-                </div>
-                <div class="panel-tab" onclick="Panel.show('output')">
-                    <i class="fas fa-list-alt"></i> OUTPUT
-                </div>
+            <div style="height:30px; display:flex; align-items:center; background:var(--bg-panel); border-bottom:1px solid #333;">
+                <div class="panel-tab active" onclick="Panel.show('term')">TERMINAL</div>
+                <div class="panel-tab" onclick="Panel.show('console')">DEBUG CONSOLE</div>
+                <div class="panel-tab" onclick="Panel.show('git')">GIT GRAPH</div>
                 <div style="flex:1"></div>
-                <div class="panel-tab" onclick="Panel.clear()">
-                    <i class="fas fa-trash"></i>
-                </div>
-                <div class="panel-tab" onclick="Layout.toggleLayout('terminal')">
-                    <i class="fas fa-times"></i>
-                </div>
+                <div class="panel-tab" onclick="Term.instance.clear()"><i class="fas fa-trash"></i></div>
+                <div class="panel-tab" onclick="Layout.toggleLayout('terminal')"><i class="fas fa-times"></i></div>
             </div>
             <div id="panel-body" style="flex:1; background:#09090b; position:relative; overflow:hidden;">
-                <div id="term-host" class="panel-content" style="height:100%; padding-left: 5px;"></div>
-                <div id="console-host" class="panel-content hidden" style="height:100%; overflow:auto;"></div>
-                <div id="problems-host" class="panel-content hidden" style="height:100%; overflow:auto; padding:12px;">
-                    <div style="text-align:center; padding:40px; color:#71717a;">
-                        <i class="fas fa-check-circle" style="font-size:48px; color:#22c55e; margin-bottom:12px;"></i>
-                        <div>No problems detected</div>
-                    </div>
-                </div>
-                <div id="output-host" class="panel-content hidden" style="height:100%; overflow:auto; padding:12px; font-family:'JetBrains Mono'; font-size:12px; color:#a1a1aa;">
-                    <div>[Output] Ready for execution...</div>
-                </div>
+                <div id="term-host" class="fit-height" style="height:100%; padding-left: 5px;"></div>
+                <div id="console-host" class="fit-height hidden" style="height:100%; padding:10px; overflow:auto; font-family:'JetBrains Mono', monospace; font-size:12px;"></div>
+                <div id="git-host" class="fit-height hidden" style="height:100%; display:flex; align-items:center; justify-content:center; color:#52525b;">Simulated Git Graph Visualization</div>
             </div>
         </div>
     </div>
@@ -955,546 +249,121 @@
     <!-- Preview / Runner -->
     <div class="resizer r-w hidden" id="rs-preview" style="left:0;"></div>
     <div id="preview-wrap">
-        <div class="url-bar">
-             <div style="display:flex; align-items:center; gap:8px;">
-                 <i class="fas fa-lock" style="font-size:11px; color:#22c55e;"></i>
-                 <input id="preview-url" value="localhost:3000" readonly style="cursor:default;">
+        <div class="url-bar flex ac jb" style="height:32px; background:#f4f4f5; padding:0 8px; border-bottom:1px solid #ddd;">
+             <div class="flex ac gap-2" style="font-size:12px; color:#444;">
+                 <i class="fas fa-globe"></i> localhost:3000
              </div>
-             <div style="display:flex; gap:6px;">
-                 <button class="btn" onclick="Runner.exec()" title="Reload" style="height:24px; padding:0 8px;">
-                     <i class="fas fa-sync"></i>
-                 </button>
-                 <button class="btn" onclick="Runner.popout()" title="Open in New Tab" style="height:24px; padding:0 8px;">
-                     <i class="fas fa-external-link-alt"></i>
-                 </button>
-                 <button class="btn" onclick="Layout.toggleLayout('preview')" title="Close" style="height:24px; padding:0 8px;">
-                     <i class="fas fa-times"></i>
-                 </button>
+             <div class="flex gap-2">
+                 <i class="fas fa-sync" onclick="Runner.exec()" style="cursor:pointer; color:#666; font-size:12px;"></i>
+                 <i class="fas fa-external-link-alt" onclick="Runner.popout()" style="cursor:pointer; color:#666; font-size:12px;"></i>
              </div>
         </div>
-        <iframe id="preview-frame" style="flex:1; border:none; background:white;" sandbox="allow-scripts allow-same-origin allow-forms allow-modals"></iframe>
+        <iframe id="preview-frame" style="flex:1; border:none; background:white;"></iframe>
     </div>
 </div>
 
-<!-- FOOTER -->
 <footer>
-    <div class="f-stat">
-        <i class="fas fa-code-branch f-icon"></i> 
-        <span>main</span>
-    </div>
-    <div class="f-stat">
-        <span id="err-count" onclick="Panel.show('problems'); Layout.toggleLayout('terminal', true)">
-            <i class="fas fa-times-circle f-icon"></i> 0
-        </span> 
-        <span id="warn-count">
-            <i class="fas fa-exclamation-triangle f-icon"></i> 0
-        </span>
-    </div>
+    <div class="f-stat"><i class="fas fa-code-branch"></i> main*</div>
+    <div class="f-stat"><span id="err-count"><i class="fas fa-times-circle"></i> 0</span> <span id="warn-count"><i class="fas fa-exclamation-triangle"></i> 0</span></div>
     <div style="flex:1"></div>
     <div class="f-stat">
         <span id="cursor-pos">Ln 1, Col 1</span>
-        <span>•</span>
         <span id="file-lang">JavaScript</span>
-        <span>•</span>
         <span id="file-enc">UTF-8</span>
-        <span>•</span>
-        <span id="file-size">0 B</span>
     </div>
-    <div style="width:30px; background:#4f46e5; text-align:center; cursor:pointer;" onclick="UI.showNotifications()" title="Notifications">
-        <i class="fas fa-bell"></i>
-    </div>
+    <div style="width:20px; background:#4f46e5; text-align:center"><i class="fas fa-bell"></i></div>
 </footer>
 
-<!-- COMMAND PALETTE -->
-<div id="cmd-palette">
-    <input id="cmd-input" placeholder="Type a command or search..." onkeyup="Command.filter(event)" onkeydown="Command.navigate(event)">
-    <div class="cmd-list" id="cmd-list"></div>
-</div>
-
-<!-- MODALS -->
-<div id="modal-overlay" class="modal-overlay" onclick="if(event.target===this) UI.closeModal()">
-    <div class="modal" id="modal-content"></div>
-</div>
-
-<!-- AI ASSISTANT -->
-<div id="ai-float" class="float-widget">
-    <div class="ai-header" id="ai-drag-handle">
-        <div class="ai-title">
-            <i class="fas fa-sparkles"></i> AI Assistant
-        </div>
-        <div style="display:flex; gap:12px; align-items:center;">
-            <i class="fas fa-minus" style="cursor:pointer; opacity:0.7;" onclick="AI.minimize()" title="Minimize"></i>
-            <i class="fas fa-times" style="cursor:pointer" onclick="AI.toggle()" title="Close"></i>
-        </div>
+<!-- AI BOX -->
+<div id="ai-float" class="col">
+    <div class="jb flex ac" style="padding:12px; border-bottom:1px solid #333; background:#1f1f22; border-radius:12px 12px 0 0;">
+        <span style="font-weight:bold; color:var(--primary)"><i class="fas fa-sparkles"></i> AI Assistant</span>
+        <i class="fas fa-times" style="cursor:pointer" onclick="AI.toggle()"></i>
     </div>
-    <div id="ai-messages" class="ai-messages">
-        <div class="msg-bubble msg-sys">
-            👋 Hello! I'm your AI coding assistant. I can:
-            <ul style="margin:8px 0; padding-left:20px;">
-                <li>Explain code and debug errors</li>
-                <li>Generate React components</li>
-                <li>Optimize algorithms</li>
-                <li>Answer programming questions</li>
-            </ul>
-            How can I help you today?
-        </div>
+    <div id="ai-messages" style="flex:1; overflow-y:auto; padding:15px; display:flex; flex-direction:column; gap:10px;">
+        <div class="msg-bubble msg-sys">Hello! I can explain code, debug errors, or generate React components for you.</div>
     </div>
-    <div class="ai-input-wrapper">
-        <input id="ai-input" placeholder="Ask me anything..." onkeydown="if(event.key==='Enter') AI.send()">
-        <button onclick="AI.send()"><i class="fas fa-paper-plane"></i></button>
+    <div style="padding:10px; border-top:1px solid #333; background:#18181b">
+        <input id="ai-input" class="btn" style="width:100%; height:36px; border:1px solid #333; color:white; background:black;" placeholder="Ask me anything..." onkeydown="if(event.key==='Enter') AI.send()">
     </div>
 </div>
 
 <script>
 /** 
- * ═══════════════════════════════════════════════════════════════
- * PRO CODE IDE v14.0 ULTIMATE EDITION - CORE ENGINE
- * ═══════════════════════════════════════════════════════════════
+ * PRO CODE IDE v13.0 CORE ENGINE
  */
 
-// ═══════════════════════════════════════════════════════════════
-// GLOBAL STATE MANAGEMENT
-// ═══════════════════════════════════════════════════════════════
+// GLOBAL STATE
 const State = {
-    files: {},
-    tabs: [],
+    files: {}, // Path -> Content
+    tabs: [], // Array of Paths
     activeTab: null,
-    term: null,
-    history: { undo: [], redo: [] },
-    settings: {
-        theme: 'dark',
-        fontSize: 14,
-        minimap: true,
-        autosave: true,
-        wordwrap: false,
-        terminalFontSize: 13
-    },
+    term: null, // Terminal Instance
+    pyodide: null, // Python Runtime
     
+    // Project Defaults
     templates: {
         'vanilla': {
             'index.html': `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>My App</title>
-  <link rel="stylesheet" href="./style.css">
+  <title>App</title>
+  <style> body { font-family: sans-serif; display: grid; place-items: center; height: 100vh; background: #f0f0f0; } h1 { color: #6366f1; } </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Welcome to Pro Code IDE</h1>
-    <p>Start building amazing things!</p>
-    <button id="btn">Click Me</button>
-  </div>
-  <script src="./main.js"></script>
+  <h1>Hello World</h1>
+  <script src="./main.js"><\/script>
 </body>
 </html>`,
-            'style.css': `* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  font-family: 'Inter', sans-serif;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.container {
-  background: white;
-  padding: 40px;
-  border-radius: 16px;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-  text-align: center;
-  max-width: 500px;
-}
-
-h1 {
-  color: #667eea;
-  margin-bottom: 16px;
-  font-size: 32px;
-}
-
-p {
-  color: #666;
-  margin-bottom: 24px;
-  font-size: 16px;
-}
-
-button {
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  color: white;
-  border: none;
-  padding: 12px 32px;
-  border-radius: 8px;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: transform 0.2s;
-}
-
-button:hover {
-  transform: translateY(-2px);
-}
-
-button:active {
-  transform: translateY(0);
-}`,
-            'main.js': `console.log('🚀 App Started!');
-
-const button = document.getElementById('btn');
-let clicks = 0;
-
-button.addEventListener('click', () => {
-  clicks++;
-  button.textContent = \`Clicked \${clicks} times!\`;
-  
-  if (clicks === 1) {
-    console.log('First click! 🎉');
-  }
-  
-  // Fun animation
-  button.style.transform = 'scale(0.95)';
-  setTimeout(() => {
-    button.style.transform = 'scale(1)';
-  }, 100);
-});
-
-// Keyboard shortcuts
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'r' && e.ctrlKey) {
-    e.preventDefault();
-    clicks = 0;
-    button.textContent = 'Click Me';
-    console.log('Counter reset!');
-  }
-});`
+            'main.js': `console.log('App Started');\ndocument.querySelector('h1').innerText = 'Hello from ProCode!';`
         },
         'react': {
-            'index.html': `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>React App</title>
-</head>
-<body>
-  <div id="root"></div>
-  <script type="module" src="./src/main.jsx"></script>
-</body>
-</html>`,
-            'src/main.jsx': `import React from 'react';
-import ReactDOM from 'react-dom/client';
-import App from './App.jsx';
-
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);`,
-            'src/App.jsx': `import React, { useState, useEffect } from 'react';
-import './App.css';
-
-export default function App() {
-  const [count, setCount] = useState(0);
-  const [message, setMessage] = useState('Welcome!');
-  
-  useEffect(() => {
-    if (count > 0) {
-      setMessage(\`You clicked \${count} times!\`);
-    }
-  }, [count]);
-  
-  return (
-    <div className="app">
-      <div className="card">
-        <h1>⚛️ React App</h1>
-        <p className="message">{message}</p>
-        <button onClick={() => setCount(count + 1)} className="btn-primary">
-          Count: {count}
-        </button>
-        <button onClick={() => setCount(0)} className="btn-secondary">
-          Reset
-        </button>
-      </div>
-    </div>
-  );
-}`,
-            'src/App.css': `.app {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  font-family: 'Inter', sans-serif;
-}
-
-.card {
-  background: white;
-  padding: 40px;
-  border-radius: 20px;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-  text-align: center;
-  min-width: 400px;
-}
-
-h1 {
-  color: #667eea;
-  margin-bottom: 20px;
-  font-size: 36px;
-}
-
-.message {
-  color: #666;
-  font-size: 18px;
-  margin-bottom: 30px;
-}
-
-button {
-  padding: 12px 24px;
-  border-radius: 8px;
-  border: none;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  margin: 0 8px;
-}
-
-.btn-primary {
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  color: white;
-}
-
-.btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
-}
-
-.btn-secondary {
-  background: #f0f0f0;
-  color: #666;
-}
-
-.btn-secondary:hover {
-  background: #e0e0e0;
-}`
+            'index.html': `<body><div id="root"></div><script type="module" src="/src/main.jsx"><\/script></body>`,
+            'src/main.jsx': `import React from 'react';\nimport { createRoot } from 'react-dom/client';\nimport App from './App.jsx';\ncreateRoot(document.getElementById('root')).render(<App />);`,
+            'src/App.jsx': `import React, { useState } from 'react';\nimport confetti from 'canvas-confetti';\n\nexport default function App() { \n  const [c, setC] = useState(0);\n  const run = () => { setC(c+1); confetti(); };\n  return (\n    <div style={{fontFamily:'sans-serif', textAlign:'center', marginTop:'50px'}}>\n      <h1>React + Vite Style</h1>\n      <button onClick={run} style={{padding:'10px 20px', fontSize:'18px'}}>Count is {c}</button>\n    </div>\n  );\n}`,
         },
         'python': {
-            'main.py': `"""
-Pro Code IDE - Python Demo
-"""
-import sys
-import math
-
-def fibonacci(n):
-    """Generate Fibonacci sequence up to n terms"""
-    a, b = 0, 1
-    result = []
-    for _ in range(n):
-        result.append(a)
-        a, b = b, a + b
-    return result
-
-def is_prime(n):
-    """Check if a number is prime"""
-    if n < 2:
-        return False
-    for i in range(2, int(math.sqrt(n)) + 1):
-        if n % i == 0:
-            return False
-    return True
-
-# Main execution
-print("=" * 50)
-print("🐍 Python Runtime - Pro Code IDE")
-print("=" * 50)
-print(f"Python version: {sys.version}")
-print()
-
-# Demo 1: Fibonacci
-print("📊 Fibonacci sequence (10 terms):")
-print(fibonacci(10))
-print()
-
-# Demo 2: Prime numbers
-print("🔢 Prime numbers up to 50:")
-primes = [n for n in range(2, 51) if is_prime(n)]
-print(primes)
-print()
-
-print("✨ Execution completed successfully!")
-`
+            'main.py': `import sys\nprint(f"Python version: {sys.version}")\n\ndef greet(name):\n    return f"Hello, {name}!"\n\nprint(greet("Pro Code User"))`
         }
     }
 };
 
-// ═══════════════════════════════════════════════════════════════
-// UTILITY FUNCTIONS
-// ═══════════════════════════════════════════════════════════════
 const Utils = {
-    toast: (msg, type='info') => {
-        const colors = {
-            info: '#3b82f6',
-            success: '#22c55e',
-            error: '#ef4444',
-            warn: '#f59e0b'
-        };
-        Toastify({ 
-            text: msg, 
-            duration: 3000, 
-            gravity: "bottom", 
-            position: "right",
-            style: { 
-                background: colors[type],
-                borderRadius: '8px',
-                fontWeight: '600'
-            } 
-        }).showToast();
-    },
-    
+    toast: (msg, type='info') => Toastify({ text: msg, duration: 3000, gravity: "bottom", position: "right", style: { background: type=='error'?'#ef4444':type=='success'?'#22c55e':'#3b82f6' } }).showToast(),
     uuid: () => Math.random().toString(36).substr(2, 9),
-    
-    debounce: (func, wait) => {
-        let timeout;
-        return function(...args) {
-            clearTimeout(timeout);
-            timeout = setTimeout(() => func.apply(this, args), wait);
-        };
-    },
-    
-    ext: (path) => path.split('.').pop().toLowerCase(),
-    
-    formatBytes: (bytes) => {
-        if (bytes === 0) return '0 B';
-        const k = 1024;
-        const sizes = ['B', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-    },
-    
-    getFileIcon: (path) => {
-        const ext = Utils.ext(path);
-        const iconMap = {
-            js: { icon: 'fab fa-js', color: '#facc15' },
-            jsx: { icon: 'fab fa-react', color: '#3b82f6' },
-            ts: { icon: 'fab fa-js', color: '#3b82f6' },
-            tsx: { icon: 'fab fa-react', color: '#3b82f6' },
-            html: { icon: 'fab fa-html5', color: '#ea580c' },
-            css: { icon: 'fab fa-css3', color: '#0ea5e9' },
-            json: { icon: 'fas fa-code', color: '#a1a1aa' },
-            py: { icon: 'fab fa-python', color: '#3b82f6' },
-            md: { icon: 'fab fa-markdown', color: '#fff' },
-            svg: { icon: 'fas fa-image', color: '#f59e0b' },
-            png: { icon: 'fas fa-image', color: '#22c55e' },
-            jpg: { icon: 'fas fa-image', color: '#22c55e' },
-            gif: { icon: 'fas fa-image', color: '#22c55e' }
-        };
-        return iconMap[ext] || { icon: 'fas fa-file', color: '#71717a' };
-    },
-    
-    copyToClipboard: (text) => {
-        navigator.clipboard.writeText(text).then(() => {
-            Utils.toast('Copied to clipboard!', 'success');
-        }).catch(() => {
-            Utils.toast('Failed to copy', 'error');
-        });
-    }
+    debounce: (func, wait) => { let t; return function(...args) { clearTimeout(t); t = setTimeout(() => func.apply(this, args), wait); }; },
+    ext: (path) => path.split('.').pop().toLowerCase()
 };
 
-// ═══════════════════════════════════════════════════════════════
-// FILE SYSTEM (Enhanced with History)
-// ═══════════════════════════════════════════════════════════════
+// 1. FILE SYSTEM (Virtual Memory FS)
 const FS = {
     init() {
-        const saved = localStorage.getItem('procode_v14_fs');
-        const settings = localStorage.getItem('procode_v14_settings');
-        
-        if (saved) {
-            State.files = JSON.parse(saved);
-        } else {
-            // Default to React template
-            State.files = {...State.templates.react};
-        }
-        
-        if (settings) {
-            State.settings = {...State.settings, ...JSON.parse(settings)};
-        }
-        
+        // Load from LocalStorage or Default Template
+        const saved = localStorage.getItem('pc_v13_fs');
+        State.files = saved ? JSON.parse(saved) : {...State.templates.react};
         this.refreshTree();
     },
-    
     save() {
-        localStorage.setItem('procode_v14_fs', JSON.stringify(State.files));
+        localStorage.setItem('pc_v13_fs', JSON.stringify(State.files));
         const btn = document.querySelector('.fa-save');
-        if (btn) {
-            btn.style.color = '#22c55e';
-            setTimeout(() => btn.style.color = 'inherit', 800);
-        }
-        Utils.toast('Project saved', 'success');
+        btn.style.color = '#22c55e';
+        setTimeout(() => btn.style.color = 'inherit', 1000);
     },
-    
-    exists: (path) => State.files.hasOwnProperty(path),
-    
-    write: (path, content) => {
-        // Add to history for undo
-        State.history.undo.push({
-            type: 'write',
-            path: path,
-            oldContent: State.files[path] || '',
-            newContent: content
-        });
-        State.history.redo = [];
-        
-        State.files[path] = content;
-        if (State.settings.autosave) {
-            this.save();
-        }
-        this.updateFileSize(path);
-    },
-    
-    read: (path) => State.files[path],
-    
-    delete: (path) => {
-        if (!confirm(`Delete ${path}?`)) return;
-        
-        State.history.undo.push({
-            type: 'delete',
-            path: path,
-            content: State.files[path]
-        });
-        
-        delete State.files[path];
-        Tabs.close(path);
-        this.save();
-        this.refreshTree();
-        Utils.toast('File deleted', 'success');
-    },
-    
-    rename: (oldP, newP) => {
-        if (this.exists(newP)) {
-            Utils.toast('File already exists', 'error');
-            return;
-        }
-        
+    exists(path) { return State.files.hasOwnProperty(path); },
+    write(path, content) { State.files[path] = content; this.save(); },
+    read(path) { return State.files[path]; },
+    delete(path) { delete State.files[path]; Tabs.close(path); this.save(); this.refreshTree(); },
+    rename(oldP, newP) {
+        if(this.exists(newP)) return Utils.toast('Exists already', 'error');
         const content = State.files[oldP];
         delete State.files[oldP];
         State.files[newP] = content;
-        
-        if (Tabs.isActive(oldP)) {
-            Tabs.open(newP);
-        }
+        if(Tabs.isActive(oldP)) Tabs.open(newP); // Reopen as new
         Tabs.close(oldP);
-        
-        this.save();
-        this.refreshTree();
-        Utils.toast('File renamed', 'success');
+        this.save(); this.refreshTree();
     },
-    
+    // Create nested directory structure for tree view
     refreshTree() {
         const root = document.getElementById('file-tree');
         root.innerHTML = '';
@@ -1504,961 +373,493 @@ const FS = {
             const parts = path.split('/');
             let current = structure;
             parts.forEach((part, i) => {
-                if (!current[part]) {
-                    current[part] = (i === parts.length - 1) ? 
-                        { __file: true, path: path } : {};
-                }
+                if(!current[part]) current[part] = (i === parts.length - 1) ? { __file: true, path: path } : {};
                 current = current[part];
             });
         });
 
         const renderNode = (node, container, level) => {
-            Object.entries(node).sort((a, b) => {
-                if (a[1].__file && !b[1].__file) return 1;
-                if (!a[1].__file && b[1].__file) return -1;
+            Object.entries(node).sort((a,b) => {
+                if(a[1].__file && !b[1].__file) return 1; // Folder first
+                if(!a[1].__file && b[1].__file) return -1;
                 return a[0].localeCompare(b[0]);
             }).forEach(([name, data]) => {
                 if (name === '__file' || name === 'path') return;
                 
                 const item = document.createElement('div');
                 item.className = 't-item';
-                const padding = 12 + (level * 16);
+                const padding = 15 + (level * 15);
                 
                 if (data.__file) {
-                    const fileIcon = Utils.getFileIcon(name);
+                    // File
+                    const ext = name.split('.').pop();
+                    const iconMap = {js:'fab fa-js #facc15', jsx:'fab fa-react #3b82f6', html:'fab fa-html5 #ea580c', css:'fab fa-css3 #0ea5e9', json:'fas fa-code #a1a1aa', py:'fab fa-python #3b82f6', md:'fab fa-markdown #fff'};
+                    const [cls, col] = (iconMap[ext] || 'fas fa-file #71717a').split(' ');
                     
-                    item.innerHTML = `
-                        <div class="t-indent" style="padding-left:${padding}px">
-                            <i class="${fileIcon.icon} file-icon" style="color:${fileIcon.color}"></i>
-                            <span class="file-name">${name}</span>
-                        </div>
-                    `;
+                    item.innerHTML = `<div class="t-indent" style="padding-left:${padding}px"><i class="${cls}" style="color:${col}; width:20px; text-align:center"></i> ${name}</div>`;
                     item.onclick = () => Tabs.open(data.path);
                     item.setAttribute('data-path', data.path);
-                    if (State.activeTab === data.path) item.classList.add('active');
+                    if(State.activeTab === data.path) item.classList.add('active');
                     
-                    item.oncontextmenu = (e) => {
-                        e.preventDefault();
-                        ContextMenu.show(e, [
-                            { icon: 'fa-external-link-alt', label: 'Open', action: () => Tabs.open(data.path) },
-                            { icon: 'fa-edit', label: 'Rename', action: () => {
-                                const newName = prompt('New name:', name);
-                                if (newName) {
-                                    const newPath = data.path.split('/').slice(0, -1).concat(newName).join('/');
-                                    FS.rename(data.path, newPath);
-                                }
-                            }},
-                            { icon: 'fa-copy', label: 'Duplicate', action: () => {
-                                const newPath = data.path.replace(/(\.[^.]+)$/, '_copy$1');
-                                FS.write(newPath, FS.read(data.path));
-                                FS.refreshTree();
-                            }},
-                            'divider',
-                            { icon: 'fa-trash', label: 'Delete', action: () => FS.delete(data.path) }
-                        ]);
-                    };
+                    // Context Menu Trigger (Right Click)
+                    item.oncontextmenu = (e) => FS.contextMenu(e, data.path, 'file');
                 } else {
-                    item.innerHTML = `
-                        <div class="t-indent t-folder" style="padding-left:${padding}px">
-                            <i class="fas fa-folder file-icon" style="color:#d97706"></i>
-                            <span class="file-name">${name}</span>
-                        </div>
-                    `;
+                    // Folder
+                    item.innerHTML = `<div class="t-indent" style="padding-left:${padding}px"><i class="fas fa-folder" style="color:#d97706; width:20px; text-align:center"></i> ${name}</div>`;
                     const subContainer = document.createElement('div');
-                    subContainer.className = 't-sub';
-                    
-                    if (State.activeTab && State.activeTab.startsWith(name + '/')) {
-                        subContainer.style.display = 'block';
-                        item.querySelector('i').className = 'fas fa-folder-open file-icon';
-                    } else {
-                        subContainer.style.display = 'none';
-                    }
+                    subContainer.className = 't-sub hidden'; // Collapsed by default
+                    // But open if it contains active file (Simple auto expand logic)
+                    if(State.activeTab && State.activeTab.startsWith(name + '/')) subContainer.classList.remove('hidden');
 
                     item.onclick = (e) => {
                         e.stopPropagation();
-                        const isHidden = subContainer.style.display === 'none';
-                        subContainer.style.display = isHidden ? 'block' : 'none';
-                        item.querySelector('i').className = isHidden ? 
-                            'fas fa-folder-open file-icon' : 'fas fa-folder file-icon';
+                        subContainer.classList.toggle('hidden');
+                        item.querySelector('i').className = subContainer.classList.contains('hidden') ? 'fas fa-folder' : 'fas fa-folder-open';
                     };
-                    
                     renderNode(data, subContainer, level + 1);
                     container.appendChild(item);
                     container.appendChild(subContainer);
-                    return;
+                    return; // Return early because we appended manually
                 }
                 container.appendChild(item);
             });
         };
-        
         renderNode(structure, root, 0);
     },
     
-    createFilePrompt() {
-        UI.showModal('New File', `
-            <div class="form-group">
-                <label>File Path</label>
-                <input type="text" id="new-file-path" placeholder="e.g. src/components/Button.jsx" autofocus>
-            </div>
-        `, [
-            { label: 'Cancel', class: 'btn' },
-            { label: 'Create', class: 'btn primary', action: () => {
-                const path = document.getElementById('new-file-path').value.trim();
-                if (path) {
-                    FS.write(path, '');
-                    FS.refreshTree();
-                    Tabs.open(path);
-                    UI.closeModal();
-                }
-            }}
-        ]);
-    },
+    // Quick Actions
+    createFilePrompt() { const p = prompt("Path (e.g., components/Test.js):"); if(p) this.write(p, ""); this.refreshTree(); Tabs.open(p); },
+    createFolderPrompt() { const p = prompt("Folder name:"); if(p) this.write(p + "/.keep", ""); this.refreshTree(); },
     
-    createFolderPrompt() {
-        const name = prompt('Folder name:');
-        if (name) {
-            FS.write(name + '/.keep', '');
-            FS.refreshTree();
-        }
+    contextMenu(e, path, type) {
+        e.preventDefault();
+        const menu = document.createElement('div');
+        menu.style = `position:fixed; left:${e.clientX}px; top:${e.clientY}px; background:#27272a; border:1px solid #333; padding:5px; border-radius:5px; z-index:9999; width: 120px; box-shadow:0 4px 12px black;`;
+        const action = (icon, text, cb) => {
+            const d = document.createElement('div');
+            d.innerHTML = `<i class="fas ${icon}" style="width:20px"></i> ${text}`;
+            d.style = "padding:5px 8px; font-size:12px; cursor:pointer; color:#eee; border-radius:3px;";
+            d.onmouseenter = () => d.style.background = "#6366f1";
+            d.onmouseleave = () => d.style.background = "transparent";
+            d.onclick = () => { cb(); document.body.removeChild(menu); };
+            menu.appendChild(d);
+        };
+        action('fa-edit', 'Rename', () => { const newN = prompt('New path:', path); if(newN) FS.rename(path, newN); });
+        action('fa-trash', 'Delete', () => { if(confirm('Delete ' + path + '?')) FS.delete(path); });
+        
+        document.body.appendChild(menu);
+        setTimeout(() => document.addEventListener('click', () => { if(menu.parentNode) menu.parentNode.removeChild(menu); }, {once:true}), 0);
     },
     
     async exportZip() {
         const zip = new JSZip();
-        Object.entries(State.files).forEach(([k, v]) => {
-            if (!k.endsWith('.keep')) zip.file(k, v);
-        });
-        const blob = await zip.generateAsync({ type: "blob" });
-        saveAs(blob, "procode_project_v14.zip");
-        Utils.toast("Project exported successfully!", 'success');
+        Object.entries(State.files).forEach(([k,v]) => k.endsWith('.keep') ? null : zip.file(k, v));
+        const blob = await zip.generateAsync({type:"blob"});
+        saveAs(blob, "project_v13.zip");
+        Utils.toast("Project exported!");
     },
 
     importPrompt() {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.zip,.json,.js,.jsx,.html,.css,.py,.md';
-        input.multiple = true;
-        
+        const input = document.createElement('input'); input.type='file'; input.accept = '.zip, .json, .js, .html, .css, .py';
         input.onchange = async (e) => {
-            const files = Array.from(e.target.files);
-            
-            for (const file of files) {
-                if (file.name.endsWith('.zip')) {
-                    const zip = await JSZip.loadAsync(file);
-                    for (const [path, entry] of Object.entries(zip.files)) {
-                        if (!entry.dir) {
-                            State.files[path] = await entry.async("string");
-                        }
-                    }
-                    Utils.toast('ZIP project imported', 'success');
-                } else {
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                        FS.write(file.name, reader.result);
-                        FS.refreshTree();
-                        if (files.length === 1) Tabs.open(file.name);
-                    };
-                    reader.readAsText(file);
+            const file = e.target.files[0];
+            if(file.name.endsWith('.zip')) {
+                const zip = await JSZip.loadAsync(file);
+                for (const [path, entry] of Object.entries(zip.files)) {
+                    if (!entry.dir) State.files[path] = await entry.async("string");
                 }
+                FS.save(); FS.refreshTree(); Utils.toast('Imported ZIP project');
+            } else {
+                // Single File Import
+                const reader = new FileReader();
+                reader.onload = () => { FS.write(file.name, reader.result); FS.refreshTree(); Tabs.open(file.name); };
+                reader.readAsText(file);
             }
-            
-            FS.save();
-            FS.refreshTree();
-            Utils.toast(`Imported ${files.length} file(s)`, 'success');
         };
-        
         input.click();
-    },
-    
-    updateFileSize: (path) => {
-        if (State.activeTab === path) {
-            const content = State.files[path] || '';
-            const size = new Blob([content]).size;
-            document.getElementById('file-size').textContent = Utils.formatBytes(size);
-        }
     }
 };
 
-// ═══════════════════════════════════════════════════════════════
-// MONACO EDITOR (Enhanced)
-// ═══════════════════════════════════════════════════════════════
+// 2. EDITOR MANAGER (Monaco Wrapper)
 const Editor = {
     instance: null,
-    
+    model: null,
     init() {
-        document.getElementById('boot-status').textContent = 'LOADING EDITOR...';
-        
-        require.config({ 
-            paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' }
-        });
-        
+        require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' }});
         require(['vs/editor/editor.main'], () => {
+            // Theme Customization
             monaco.editor.defineTheme('procode-dark', {
-                base: 'vs-dark',
-                inherit: true,
-                rules: [
-                    { token: '', background: '09090b' },
-                    { token: 'comment', foreground: '71717a', fontStyle: 'italic' },
-                    { token: 'keyword', foreground: 'a855f7', fontStyle: 'bold' },
-                    { token: 'string', foreground: '22c55e' },
-                    { token: 'number', foreground: 'f59e0b' }
-                ],
-                colors: {
-                    'editor.background': '#09090b',
-                    'editor.foreground': '#e4e4e7',
-                    'editor.lineHighlightBackground': '#18181b',
-                    'editorCursor.foreground': '#6366f1',
-                    'editor.selectionBackground': '#374151'
-                }
+                base: 'vs-dark', inherit: true, 
+                rules: [{ token: '', background: '09090b' }],
+                colors: { 'editor.background': '#09090b' }
             });
 
             this.instance = monaco.editor.create(document.getElementById('monaco-root'), {
                 value: "",
                 language: 'javascript',
                 theme: 'procode-dark',
-                fontSize: State.settings.fontSize,
+                fontSize: 14,
                 fontFamily: 'JetBrains Mono',
-                fontLigatures: true,
-                minimap: { enabled: State.settings.minimap, scale: 0.8 },
-                padding: { top: 16, bottom: 16 },
-                automaticLayout: false,
+                minimap: { enabled: true, scale: 0.75 },
+                padding: { top: 15 },
+                automaticLayout: false, // Handle manually with ResizeObserver for better perf
                 smoothScrolling: true,
                 cursorBlinking: "smooth",
-                cursorSmoothCaretAnimation: true,
-                wordWrap: State.settings.wordwrap ? 'on' : 'off',
-                bracketPairColorization: { enabled: true },
-                guides: { bracketPairs: true },
-                suggest: {
-                    insertMode: 'replace'
-                },
-                quickSuggestions: true,
-                formatOnPaste: true,
-                formatOnType: true
             });
             
             // Events
             this.instance.onDidChangeModelContent(() => {
-                if (State.activeTab) {
+                if(State.activeTab) {
                     const val = this.instance.getValue();
+                    // Don't save empty if its virtual
                     State.files[State.activeTab] = val;
-                    
-                    // Mark tab as dirty
-                    const tab = document.querySelector(`.tab[data-path="${State.activeTab}"]`);
-                    if (tab) tab.classList.add('dirty');
-                    
-                    if (State.settings.autosave) {
-                        if (this._saveTimer) clearTimeout(this._saveTimer);
-                        this._saveTimer = setTimeout(() => FS.save(), 1500);
-                    }
-                    
-                    FS.updateFileSize(State.activeTab);
+                    // Debounce Auto-Save
+                    if (this._saveT) clearTimeout(this._saveT);
+                    this._saveT = setTimeout(() => FS.save(), 1000);
                 }
             });
             
             this.instance.onDidChangeCursorPosition((e) => {
-                document.getElementById('cursor-pos').textContent = 
-                    `Ln ${e.position.lineNumber}, Col ${e.position.column}`;
-            });
-            
-            // Keyboard shortcuts
-            this.instance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
-                Command.run('save');
-            });
-            
-            this.instance.addCommand(monaco.KeyCode.F5, () => {
-                Runner.exec();
-            });
-            
-            this.instance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyB, () => {
-                Layout.toggleLayout('preview');
-            });
-            
-            this.instance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.US_BACKTICK, () => {
-                Layout.toggleLayout('terminal');
+                document.getElementById('cursor-pos').innerText = `Ln ${e.position.lineNumber}, Col ${e.position.column}`;
             });
 
-            // Resize Observer
-            new ResizeObserver(() => {
-                this.instance.layout();
-            }).observe(document.getElementById('editor-container'));
+            // Handle Resize
+            new ResizeObserver(() => { this.instance.layout(); }).observe(document.getElementById('editor-container'));
             
+            // Initial UI state check
             document.getElementById('loader-overlay').style.display = 'none';
-            Utils.toast('Pro Code IDE v14.0 Ready! 🚀', 'success');
         });
     },
     
     setFile(path) {
         if (!this.instance) return;
-        
         const content = State.files[path] || "";
         const ext = Utils.ext(path);
         
-        // Handle non-text files
-        if (['png', 'jpg', 'gif', 'svg'].includes(ext)) {
+        // Handle Images View
+        if(['png','jpg','svg','gif'].includes(ext)) {
             document.getElementById('monaco-root').style.display = 'none';
-            // Show image viewer (stub - would need base64 data)
+            // Show Image viewer (Mock for text files based files, needs DataURI for real bin, assumed text here)
+            // Ideally we'd have FS store Base64 for images. 
+            // This is a "Stub" since we store strings in this demo.
             return;
         }
 
         document.getElementById('monaco-root').style.display = 'block';
         document.getElementById('empty-state').style.display = 'none';
-        document.getElementById('breadcrumb').style.display = 'flex';
 
-        // Language detection
-        const langMap = {
-            js: 'javascript',
-            jsx: 'javascript',
-            ts: 'typescript',
-            tsx: 'typescript',
-            html: 'html',
-            css: 'css',
-            json: 'json',
-            py: 'python',
-            md: 'markdown'
-        };
-        
-        const lang = langMap[ext] || 'plaintext';
-        const model = monaco.editor.createModel(content, lang, monaco.Uri.file(path));
+        const model = monaco.editor.createModel(content, undefined, monaco.Uri.file(path));
         this.instance.setModel(model);
         
-        // Update status bar
-        const langNames = {
-            javascript: 'JavaScript',
-            typescript: 'TypeScript',
-            python: 'Python',
-            html: 'HTML',
-            css: 'CSS',
-            json: 'JSON',
-            markdown: 'Markdown'
-        };
-        document.getElementById('file-lang').textContent = langNames[lang] || ext.toUpperCase();
-        
-        // Update breadcrumb
-        const parts = path.split('/');
-        document.getElementById('breadcrumb-path').textContent = parts.join(' › ');
-        
-        // Update file size
-        FS.updateFileSize(path);
-        
-        // Focus editor
-        this.instance.focus();
-    },
-    
-    async format() {
-        if (!this.instance || !State.activeTab) return;
-        
-        const ext = Utils.ext(State.activeTab);
-        const content = this.instance.getValue();
-        
-        try {
-            let formatted;
-            
-            if (['js', 'jsx', 'ts', 'tsx'].includes(ext)) {
-                formatted = prettier.format(content, {
-                    parser: 'babel',
-                    plugins: prettierPlugins,
-                    semi: true,
-                    singleQuote: true,
-                    tabWidth: 2
-                });
-            } else if (ext === 'html') {
-                formatted = prettier.format(content, {
-                    parser: 'html',
-                    plugins: prettierPlugins
-                });
-            } else if (ext === 'css') {
-                formatted = prettier.format(content, {
-                    parser: 'css',
-                    plugins: prettierPlugins
-                });
-            } else {
-                Utils.toast('Formatter not available for this file type', 'warn');
-                return;
-            }
-            
-            this.instance.setValue(formatted);
-            Utils.toast('Code formatted!', 'success');
-            
-        } catch (error) {
-            Utils.toast('Format error: ' + error.message, 'error');
-        }
+        // Lang Status
+        const langMap = {js:'JavaScript', py:'Python', css:'CSS', html:'HTML', json:'JSON'};
+        document.getElementById('file-lang').innerText = langMap[ext] || ext.toUpperCase();
     }
 };
 
-// ═══════════════════════════════════════════════════════════════
-// TAB MANAGEMENT (Enhanced)
-// ═══════════════════════════════════════════════════════════════
+// 3. TAB MANAGER
 const Tabs = {
     open(path) {
-        if (!State.tabs.includes(path)) {
-            State.tabs.push(path);
-        }
+        if(!State.tabs.includes(path)) State.tabs.push(path);
         this.render();
         this.activate(path);
     },
-    
     close(path) {
-        // Check if dirty
-        const tab = document.querySelector(`.tab[data-path="${path}"]`);
-        if (tab && tab.classList.contains('dirty')) {
-            if (!confirm(`${path} has unsaved changes. Close anyway?`)) {
-                return;
-            }
-        }
-        
         State.tabs = State.tabs.filter(p => p !== path);
-        
         if (State.activeTab === path) {
-            State.activeTab = State.tabs.length > 0 ? 
-                State.tabs[State.tabs.length - 1] : null;
+            State.activeTab = State.tabs.length > 0 ? State.tabs[State.tabs.length-1] : null;
         }
-        
         this.render();
         this.activate(State.activeTab);
     },
-    
     activate(path) {
         State.activeTab = path;
         
-        // Update tabs UI
+        // Update Tab UI
         document.querySelectorAll('.tab').forEach(t => {
             t.classList.toggle('active', t.getAttribute('data-path') === path);
         });
 
-        // Update tree UI
+        // Update Tree UI
         document.querySelectorAll('.t-item').forEach(t => {
             t.classList.toggle('active', t.getAttribute('data-path') === path);
         });
 
-        // Update editor
-        if (path) {
+        // Update Editor
+        if(path) {
             Editor.setFile(path);
         } else {
             document.getElementById('monaco-root').style.display = 'none';
             document.getElementById('empty-state').style.display = 'flex';
-            document.getElementById('breadcrumb').style.display = 'none';
         }
     },
-    
-    isActive: (path) => State.activeTab === path,
-    
+    isActive(path) { return State.activeTab === path; },
     render() {
-        const container = document.getElementById('tab-list');
-        container.innerHTML = '';
-        
+        const c = document.getElementById('tab-list');
+        c.innerHTML = '';
         State.tabs.forEach(path => {
             const name = path.split('/').pop();
-            const fileIcon = Utils.getFileIcon(name);
-            
-            const tab = document.createElement('div');
-            tab.className = `tab ${path === State.activeTab ? 'active' : ''}`;
-            tab.setAttribute('data-path', path);
-            tab.innerHTML = `
-                <i class="${fileIcon.icon}" style="color:${fileIcon.color}; font-size:14px;"></i>
-                <span class="tab-name">${name}</span>
-                <div class="close" onclick="event.stopPropagation(); Tabs.close('${path}')">
-                    <i class="fas fa-times"></i>
-                </div>
-            `;
-            tab.onclick = () => this.activate(path);
-            
-            // Drag to reorder
-            tab.draggable = true;
-            tab.ondragstart = (e) => {
-                e.dataTransfer.setData('path', path);
-            };
-            tab.ondragover = (e) => e.preventDefault();
-            tab.ondrop = (e) => {
-                e.preventDefault();
-                const dragPath = e.dataTransfer.getData('path');
-                const dropIndex = State.tabs.indexOf(path);
-                const dragIndex = State.tabs.indexOf(dragPath);
-                
-                State.tabs.splice(dragIndex, 1);
-                State.tabs.splice(dropIndex, 0, dragPath);
-                this.render();
-            };
-            
-            container.appendChild(tab);
+            const div = document.createElement('div');
+            div.className = `tab ${path===State.activeTab?'active':''}`;
+            div.setAttribute('data-path', path);
+            div.innerHTML = `<i class="fas fa-file-code"></i> ${name} <div class="close" onclick="event.stopPropagation(); Tabs.close('${path}')">×</div>`;
+            div.onclick = () => this.activate(path);
+            c.appendChild(div);
         });
     }
 };
 
-// ═══════════════════════════════════════════════════════════════
-// TERMINAL & CONSOLE (Enhanced)
-// ═══════════════════════════════════════════════════════════════
+// 4. TERMINAL & CONSOLE
 const Term = {
     instance: null,
     fit: null,
-    cwd: '/',
-    commandHistory: [],
-    historyIndex: -1,
+    cwd: '/', // Virtual Current Working Directory
     
     init() {
-        document.getElementById('boot-status').textContent = 'INITIALIZING TERMINAL...';
-        
         this.instance = new Terminal({
-            theme: { 
-                background: '#09090b',
-                foreground: '#e4e4e7',
-                cursor: '#6366f1',
-                selectionBackground: '#374151'
-            },
-            fontFamily: 'JetBrains Mono',
-            fontSize: State.settings.terminalFontSize,
-            cursorBlink: true,
-            cursorStyle: 'block',
-            bellStyle: 'none',
-            allowTransparency: true
+            theme: { background: '#09090b' },
+            fontFamily: 'JetBrains Mono', fontSize: 13,
+            cursorBlink: true
         });
-        
         this.fit = new FitAddon.FitAddon();
         this.instance.loadAddon(this.fit);
         this.instance.loadAddon(new WebLinksAddon.WebLinksAddon());
         
         this.instance.open(document.getElementById('term-host'));
-        this.welcome();
+        this.instance.write('\x1b[35mPro Code Terminal\x1b[0m \r\n$ ');
         
+        // Simple Shell Implementation
         let cmd = '';
         this.instance.onData(e => {
-            switch (e) {
+            switch(e) {
                 case '\r': // Enter
                     this.instance.write('\r\n');
-                    if (cmd.trim()) {
-                        this.commandHistory.push(cmd);
-                        this.historyIndex = this.commandHistory.length;
-                        this.exec(cmd);
-                    } else {
-                        this.prompt();
-                    }
+                    this.exec(cmd);
                     cmd = '';
                     break;
-                    
                 case '\u007f': // Backspace
                     if (cmd.length > 0) {
                         this.instance.write('\b \b');
                         cmd = cmd.slice(0, -1);
                     }
                     break;
-                    
-                case '\u001b[A': // Up arrow
-                    if (this.historyIndex > 0) {
-                        // Clear current line
-                        this.instance.write('\r\x1b[K');
-                        this.instance.write(`\x1b[32m$\x1b[0m `);
-                        this.historyIndex--;
-                        cmd = this.commandHistory[this.historyIndex];
-                        this.instance.write(cmd);
-                    }
-                    break;
-                    
-                case '\u001b[B': // Down arrow
-                    if (this.historyIndex < this.commandHistory.length - 1) {
-                        this.instance.write('\r\x1b[K');
-                        this.instance.write(`\x1b[32m$\x1b[0m `);
-                        this.historyIndex++;
-                        cmd = this.commandHistory[this.historyIndex];
-                        this.instance.write(cmd);
-                    }
-                    break;
-                    
-                case '\t': // Tab - autocomplete
-                    const matches = Object.keys(State.files).filter(f => 
-                        f.startsWith(cmd)
-                    );
-                    if (matches.length === 1) {
-                        this.instance.write(matches[0].slice(cmd.length));
-                        cmd = matches[0];
-                    }
-                    break;
-                    
-                default:
-                    if (e >= String.fromCharCode(0x20) && e <= String.fromCharCode(0x7E)) {
-                        this.instance.write(e);
-                        cmd += e;
-                    }
+                default: // Type
+                    this.instance.write(e);
+                    cmd += e;
             }
         });
         
-        new ResizeObserver(() => {
-            if (this.fit) this.fit.fit();
-        }).observe(document.getElementById('panel-btm'));
-    },
-    
-    welcome() {
-        this.instance.write('\x1b[35m╔═══════════════════════════════════════╗\x1b[0m\r\n');
-        this.instance.write('\x1b[35m║   \x1b[36mPro Code Terminal v14.0\x1b[35m         ║\x1b[0m\r\n');
-        this.instance.write('\x1b[35m╚═══════════════════════════════════════╝\x1b[0m\r\n');
-        this.instance.write('\r\n');
-        this.instance.write('Type \x1b[33mhelp\x1b[0m for available commands\r\n\r\n');
-        this.prompt();
-    },
-    
-    prompt() {
-        this.instance.write(`\x1b[32m$\x1b[0m `);
+        // Observer resize for Terminal fit
+        new ResizeObserver(() => this.fit.fit()).observe(document.getElementById('panel-btm'));
     },
     
     exec(input) {
         const [cmd, ...args] = input.trim().split(' ');
-        const commands = {
-            help: () => {
-                this.print('Available commands:', '36');
-                this.print('  ls              - List files', '37');
-                this.print('  cat <file>      - Display file contents', '37');
-                this.print('  clear           - Clear terminal', '37');
-                this.print('  echo <text>     - Print text', '37');
-                this.print('  tree            - Show file tree', '37');
-                this.print('  run             - Execute current file', '37');
-                this.print('  history         - Show command history', '37');
-                this.print('  export          - Export project', '37');
-            },
-            
-            ls: () => {
-                const files = Object.keys(State.files).sort();
-                files.forEach(f => {
-                    const icon = Utils.ext(f) ? '📄' : '📁';
-                    this.instance.write(`${icon} ${f}\r\n`);
-                });
-            },
-            
-            cat: () => {
-                const file = args[0];
-                if (!file) {
-                    this.error('Usage: cat <filename>');
-                } else if (!FS.exists(file)) {
-                    this.error(`File not found: ${file}`);
-                } else {
-                    const content = FS.read(file);
-                    this.instance.write(content + '\r\n');
-                }
-            },
-            
-            clear: () => {
-                this.instance.clear();
-                this.welcome();
-                return;
-            },
-            
-            echo: () => {
-                this.instance.write(args.join(' ') + '\r\n');
-            },
-            
-            tree: () => {
-                this.print('Project Structure:', '36');
-                Object.keys(State.files).sort().forEach(path => {
-                    const depth = path.split('/').length - 1;
-                    const indent = '  '.repeat(depth);
-                    const name = path.split('/').pop();
-                    this.instance.write(`${indent}├─ ${name}\r\n`);
-                });
-            },
-            
-            run: () => {
-                this.print('Executing...', '33');
-                Runner.exec();
-            },
-            
-            history: () => {
-                this.commandHistory.forEach((cmd, i) => {
-                    this.instance.write(`${i + 1}  ${cmd}\r\n`);
-                });
-            },
-            
-            export: () => {
-                this.print('Exporting project...', '33');
-                FS.exportZip();
-            },
-            
-            pwd: () => {
-                this.instance.write(this.cwd + '\r\n');
-            },
-            
-            date: () => {
-                this.instance.write(new Date().toString() + '\r\n');
+        
+        if(cmd === 'ls') {
+            const pathPrefix = this.cwd === '/' ? '' : this.cwd.substring(1) + '/'; 
+            const files = Object.keys(State.files).filter(f => f.startsWith(pathPrefix));
+            const distinct = new Set(files.map(f => {
+                const rest = f.substring(pathPrefix.length);
+                return rest.split('/')[0];
+            }));
+            this.instance.write(Array.from(distinct).join('  ') + '\r\n');
+        } 
+        else if (cmd === 'cd') {
+            const newDir = args[0];
+            if(newDir === '..') {
+                this.cwd = '/'; // Simple root reset for demo (complex logic skipped)
+            } else {
+                // Check simple folder existence existence via key check prefix
+                this.cwd = (this.cwd === '/' ? '/' : this.cwd + '/') + newDir;
             }
-        };
-        
-        if (cmd === '') {
-            this.prompt();
-        } else if (commands[cmd]) {
-            commands[cmd]();
-            this.prompt();
-        } else {
-            this.error(`Command not found: ${cmd}`);
-            this.prompt();
+            this.instance.write('\r\n');
         }
-    },
-    
-    print(text, color = '37') {
-        this.instance.write(`\x1b[${color}m${text}\x1b[0m\r\n`);
-    },
-    
-    error(text) {
-        this.instance.write(`\x1b[31m✗ ${text}\x1b[0m\r\n`);
-    },
-    
-    success(text) {
-        this.instance.write(`\x1b[32m✓ ${text}\x1b[0m\r\n`);
+        else if (cmd === 'clear') { this.instance.clear(); }
+        else if (cmd === 'python' && args[0]) {
+             // Mock command run (real python run handled by Runner)
+             this.instance.write(`Running python: ${args[0]}... Use 'Run' button for env integration.\r\n`);
+        }
+        else if (cmd === 'help') {
+            this.instance.write('Commands: ls, cd, cat, clear, node (mock), python (mock)\r\n');
+        }
+        else if (cmd === '') {} 
+        else { this.instance.write(`command not found: ${cmd}\r\n`); }
+        
+        this.instance.write(`\x1b[32muser@procode\x1b[0m:\x1b[34m${this.cwd}\x1b[0m$ `);
     }
 };
 
-// ═══════════════════════════════════════════════════════════════
-// CONSOLE & DEBUG OUTPUT
-// ═══════════════════════════════════════════════════════════════
-const Console = {
-    log(message, type = 'log') {
-        const container = document.getElementById('console-host');
-        const line = document.createElement('div');
-        line.className = `console-line ${type}`;
-        
-        const icon = {
-            log: 'fas fa-info-circle',
-            error: 'fas fa-times-circle',
-            warn: 'fas fa-exclamation-triangle'
-        }[type];
-        
-        line.innerHTML = `
-            <i class="${icon} icon"></i>
-            <span>${this.format(message)}</span>
-        `;
-        
-        container.appendChild(line);
-        container.scrollTop = container.scrollHeight;
-        
-        // Update error/warning counts
-        if (type === 'error') {
-            const count = container.querySelectorAll('.console-line.error').length;
-            document.getElementById('err-count').innerHTML = 
-                `<i class="fas fa-times-circle f-icon"></i> ${count}`;
-        } else if (type === 'warn') {
-            const count = container.querySelectorAll('.console-line.warn').length;
-            document.getElementById('warn-count').innerHTML = 
-                `<i class="fas fa-exclamation-triangle f-icon"></i> ${count}`;
-        }
-    },
-    
-    format(obj) {
-        if (typeof obj === 'object') {
-            return JSON.stringify(obj, null, 2);
-        }
-        return String(obj);
-    },
-    
-    clear() {
-        document.getElementById('console-host').innerHTML = '';
-        document.getElementById('err-count').innerHTML = 
-            '<i class="fas fa-times-circle f-icon"></i> 0';
-        document.getElementById('warn-count').innerHTML = 
-            '<i class="fas fa-exclamation-triangle f-icon"></i> 0';
-    }
-};
-
-// ═══════════════════════════════════════════════════════════════
-// RUNNER & BUNDLER (Enhanced)
-// ═══════════════════════════════════════════════════════════════
+// 5. RUNNER (Bundler + Transpiler)
 const Runner = {
     async exec() {
         const frame = document.getElementById('preview-frame');
         
-        // Python execution
+        // Check for Python main file
         if (State.activeTab && State.activeTab.endsWith('.py')) {
-            return this.runPython(State.activeTab);
-        }
-
-        Layout.toggleLayout('preview', true);
-        Layout.toggleLayout('terminal', true);
-        Panel.show('console');
-        Console.clear();
-
-        const files = State.files;
-        let entry = files['index.html'] || Object.keys(files).find(f => f.endsWith('.html'));
-
-        if (!entry) {
-            Utils.toast("No index.html found", 'error');
-            Console.log('No HTML entry point found. Create index.html to run the app.', 'error');
+            this.runPython(State.activeTab);
             return;
         }
 
-        Console.log('🚀 Building application...', 'log');
+        // --- WEB BUNDLING (React/HTML/JS) ---
+        Layout.toggleLayout('preview', true);
+        Layout.showConsole(); // Open console tab to see logs
+
+        const files = State.files;
+        let entry = files['index.html'] ? 'index.html' : Object.keys(files).find(f => f.endsWith('html'));
+
+        if (!entry) return Utils.toast("No index.html found", 'error');
+
+        // Transform Code Imports
+        // 1. Convert bare imports (import x from 'y') -> CDN
+        // 2. Convert relative imports (import x from './file') -> Blob URLs
+        const modules = {}; // Map of local path -> blob URL
         
-        try {
-            const modules = {};
-            
-            // Process JS/JSX files
-            for (let path of Object.keys(files)) {
-                if (path.match(/\.(js|jsx)$/)) {
-                    let code = files[path];
-                    
-                    // Transpile JSX
-                    if (path.endsWith('.jsx')) {
-                        try {
-                            code = Babel.transform(code, {
-                                presets: ['react'],
-                                filename: path
-                            }).code;
-                        } catch (e) {
-                            Console.log(`Transpile error in ${path}: ${e.message}`, 'error');
-                            return;
-                        }
-                    }
-                    
-                    // Replace imports
-                    code = code.replace(
-                        /import\s+(?:[\w*\s{},]+)\s+from\s+['"]([^'"]+)['"]/g,
-                        (match, specifier) => {
-                            if (specifier.startsWith('./') || specifier.startsWith('/')) {
-                                return match;
-                            } else if (!specifier.startsWith('http')) {
-                                return match.replace(specifier, `https://esm.sh/${specifier}`);
-                            }
-                            return match;
-                        }
-                    );
-                    
-                    modules[path] = code;
-                }
-            }
+        // Step 1: Process JS/JSX files into Blobs
+        for(let path of Object.keys(files)) {
+             if (path.match(/\.(js|jsx|ts|tsx)$/)) {
+                 let code = files[path];
+                 // If JSX/TS, transpile
+                 if (path.match(/\.(jsx|tsx)$/)) {
+                     try {
+                         code = Babel.transform(code, { presets: ['react', 'env'], filename: path }).code;
+                     } catch(e) { console.error(e); }
+                 }
+                 
+                 // Rewriter for ESM imports
+                 // A simple Regex approach. For prod, use Babel AST traverse.
+                 // Match: import ... from '...'
+                 code = code.replace(/import\s+(?:[\w*\s{},]+)\s+from\s+['"]([^'"]+)['"]/g, (match, specifier) => {
+                     // 1. Local Import
+                     if (specifier.startsWith('./') || specifier.startsWith('/')) {
+                         // Resolve path... (Simplified)
+                         const clean = specifier.replace(/^\.\//, '').replace(/^\//, '');
+                         // Note: In blob isolation, we can't really resolve relative URLs well 
+                         // without creating an object URL map beforehand. 
+                         // Advanced trick: Rewriting code inside Iframe hook. 
+                         // FOR NOW: Assume 'specifier' is mapped at run-time by Import Map.
+                         return match; 
+                     } 
+                     // 2. External Import
+                     else if(!specifier.startsWith('http')) {
+                         return match.replace(specifier, `https://esm.sh/${specifier}`);
+                     }
+                     return match;
+                 });
 
-            let html = files[entry];
-            
-            // Create import map
-            const importMap = { imports: {} };
-            const blobUrls = [];
-            
-            for (let [path, code] of Object.entries(modules)) {
-                const blob = new Blob([code], { type: 'text/javascript' });
-                const url = URL.createObjectURL(blob);
-                blobUrls.push(url);
-                
-                importMap.imports[`./${path}`] = url;
-                importMap.imports[`/${path}`] = url;
-                const noExt = path.replace(/\.[^/.]+$/, "");
-                importMap.imports[`./${noExt}`] = url;
-            }
-
-            // Inject console capture and import map
-            const injector = `
-                <script>
-                    const originalLog = console.log;
-                    const originalError = console.error;
-                    const originalWarn = console.warn;
-                    
-                    console.log = (...args) => {
-                        window.parent.postMessage({
-                            type: 'console',
-                            level: 'log',
-                            args: args.map(a => String(a))
-                        }, '*');
-                        originalLog(...args);
-                    };
-                    
-                    console.error = (...args) => {
-                        window.parent.postMessage({
-                            type: 'console',
-                            level: 'error',
-                            args: args.map(a => String(a))
-                        }, '*');
-                        originalError(...args);
-                    };
-                    
-                    console.warn = (...args) => {
-                        window.parent.postMessage({
-                            type: 'console',
-                            level: 'warn',
-                            args: args.map(a => String(a))
-                        }, '*');
-                        originalWarn(...args);
-                    };
-                    
-                    window.onerror = (msg, url, line, col, error) => {
-                        window.parent.postMessage({
-                            type: 'error',
-                            message: msg,
-                            line: line,
-                            col: col
-                        }, '*');
-                        return false;
-                    };
-                <\/script>
-                <script type="importmap">${JSON.stringify(importMap)}<\/script>
-            `;
-
-            html = html.replace(/<head>/i, '<head>' + injector);
-
-            // Inject CSS files
-            for (let [path, content] of Object.entries(files)) {
-                if (path.endsWith('.css')) {
-                    html = html.replace(
-                        new RegExp(`<link[^>]+href=['"]\.?\/?${path}['"][^>]*>`, 'gi'),
-                        `<style>${content}</style>`
-                    );
-                }
-            }
-
-            frame.srcdoc = html;
-            Console.log('✅ Application running successfully!', 'log');
-            Utils.toast("Running...", 'success');
-            
-            // Cleanup old blob URLs after some time
-            setTimeout(() => {
-                blobUrls.forEach(url => URL.revokeObjectURL(url));
-            }, 5000);
-            
-        } catch (error) {
-            Console.log(`Build error: ${error.message}`, 'error');
-            Utils.toast('Build failed', 'error');
+                 modules[path] = code;
+             }
         }
+
+        let html = files[entry];
+        
+        // Inject Virtual File System resolution via ImportMap + Hook
+        const importMap = { imports: {} };
+        const blobUrls = []; // Keep track to cleanup
+
+        // Create Blobs for Local Modules
+        for(let [path, code] of Object.entries(modules)) {
+            // Rewrite local imports in code
+             const relImports = [...code.matchAll(/from\s+['"]\.\/([^'"]+)['"]/g)];
+             // We need a complex topology sort to do this perfectly.
+             // Simplification: Since we use importmap, mapped names work!
+             const blob = new Blob([code], {type: 'text/javascript'});
+             const url = URL.createObjectURL(blob);
+             blobUrls.push(url);
+             
+             // Map ./main.js -> blob:...
+             importMap.imports[`./${path}`] = url;
+             importMap.imports[`/${path}`] = url;
+             // Try handling no extension
+             const noExt = path.replace(/\.[^/.]+$/, "");
+             importMap.imports[`./${noExt}`] = url;
+        }
+
+        // Script to intercept console and errors
+        const injector = `
+        <script>
+           // Capture Console
+           const _log = console.log; console.log = (...args) => { window.parent.postMessage({type:'log', args: args.map(String)}, '*'); _log(...args); };
+           window.onerror = (msg, url, line) => { window.parent.postMessage({type:'err', msg, line}, '*'); };
+        <\/script>
+        <script type="importmap">${JSON.stringify(importMap)}<\/script>
+        `;
+
+        // Inject
+        html = html.replace('<head>', '<head>' + injector);
+
+        // Render
+        frame.srcdoc = html;
+        
+        Utils.toast("Bundling & Running...");
     },
 
     async runPython(path) {
         Layout.toggleLayout('terminal', true);
-        Panel.show('term');
+        Term.instance.write(`\r\n\x1b[33m>>> Loading Pyodide...\x1b[0m\r\n`);
         
-        Term.print('Loading Python runtime...', '33');
+        // Initialize Pyodide if not already
+        if (!State.pyodide) {
+            try {
+                // Note: The CDN for Pyodide loads external resources. This works if CSP allow.
+                State.pyodide = await loadPyodide();
+            } catch (e) {
+                Term.instance.write(`\x1b[31mError loading Pyodide: ${e}\x1b[0m\r\n`);
+                return;
+            }
+        }
         
-        // Note: Pyodide loading is complex - this is a placeholder
-        Term.print('Python execution requires Pyodide library', '33');
-        Term.print('Use the Terminal to run Python commands', '37');
-        Term.prompt();
+        Term.instance.write(`\x1b[33m>>> Executing ${path}...\x1b[0m\r\n`);
+        const code = State.files[path];
+        
+        // Redirect stdout
+        State.pyodide.setStdout({ batched: (str) => { Term.instance.write(str + '\r\n'); } });
+        
+        try {
+            await State.pyodide.runPythonAsync(code);
+        } catch(err) {
+            Term.instance.write(`\x1b[31m${err}\x1b[0m\r\n`);
+        }
+        Term.instance.write(`\x1b[32m>>> Finished.\x1b[0m\r\n$ `);
     },
 
     popout() {
         const frame = document.getElementById('preview-frame');
-        const blob = new Blob([frame.srcdoc], { type: 'text/html' });
-        const url = URL.createObjectURL(blob);
-        window.open(url, '_blank');
+        const win = window.open('', '_blank');
+        win.document.write(frame.srcdoc);
     }
 };
 
-// ═══════════════════════════════════════════════════════════════
-// LAYOUT MANAGEMENT (Enhanced)
-// ═══════════════════════════════════════════════════════════════
+// 6. LAYOUT MANAGER
 const Layout = {
     setSide(id) {
         document.querySelectorAll('.sidebar').forEach(s => s.classList.remove('active'));
-        const target = document.getElementById('side-' + id);
-        if (target) target.classList.add('active');
+        const target = document.getElementById('side-'+id);
+        if(target) target.classList.add('active');
         
         document.querySelectorAll('.act-btn').forEach(b => b.classList.remove('active'));
-        const btn = document.querySelector(`.act-btn[data-id="${id}"]`);
-        if (btn) btn.classList.add('active');
+        document.querySelector(`.act-btn[data-id="${id}"]`).classList.add('active');
         
+        // Hack: fix resize issue when sidebar toggles editor width
         setTimeout(() => Editor.instance && Editor.instance.layout(), 100);
     },
     
     toggleLayout(panel, forceShow = false) {
-        if (panel === 'preview') {
+        // Toggle Terminal or Preview
+        if(panel === 'preview') {
             const el = document.getElementById('preview-wrap');
             const handle = document.getElementById('rs-preview');
             const isVisible = el.classList.contains('visible');
             
-            if (!isVisible || forceShow) {
+            if(!isVisible || forceShow) {
                 el.classList.add('visible');
                 handle.classList.remove('hidden');
             } else {
                 el.classList.remove('visible');
                 handle.classList.add('hidden');
             }
-        } else if (panel === 'terminal') {
+        } 
+        else if (panel === 'terminal') {
             const el = document.getElementById('panel-btm');
             if (el.classList.contains('hidden') || forceShow) {
                 el.classList.remove('hidden');
@@ -2466,562 +867,80 @@ const Layout = {
                 el.classList.add('hidden');
             }
         }
-        
-        setTimeout(() => {
-            if (Editor.instance) Editor.instance.layout();
-            if (Term.fit) Term.fit.fit();
+        setTimeout(() => { 
+            Editor.instance && Editor.instance.layout(); 
+            if(Term.fit) Term.fit.fit();
         }, 300);
+    },
+    showConsole() {
+        this.toggleLayout('terminal', true);
+        Panel.show('console');
     }
 };
 
-// ═══════════════════════════════════════════════════════════════
-// PANEL MANAGEMENT
-// ═══════════════════════════════════════════════════════════════
 const Panel = {
     show(id) {
-        document.querySelectorAll('.panel-content').forEach(d => d.classList.add('hidden'));
-        document.getElementById(id + '-host').classList.remove('hidden');
-        
+        document.querySelectorAll('#panel-body > div').forEach(d => d.classList.add('hidden'));
+        document.getElementById(id+'-host').classList.remove('hidden');
         document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
-        event.target.classList.add('active');
+        event.target.classList.add('active'); // Dirty event usage but works for generated HTML
         
-        if (id === 'term' && Term.fit) {
-            setTimeout(() => Term.fit.fit(), 100);
-        }
-    },
-    
-    clear() {
-        const activePanel = document.querySelector('.panel-content:not(.hidden)');
-        if (activePanel) {
-            if (activePanel.id === 'term-host') {
-                Term.instance.clear();
-                Term.welcome();
-            } else if (activePanel.id === 'console-host') {
-                Console.clear();
-            }
-        }
+        if(id === 'term') Term.fit.fit();
     }
-};
+}
 
-// ═══════════════════════════════════════════════════════════════
-// SEARCH FUNCTIONALITY
-// ═══════════════════════════════════════════════════════════════
-const Search = {
-    options: {
-        case: false,
-        word: false,
-        regex: false
-    },
-    
-    perform: Utils.debounce(function() {
-        const query = document.getElementById('search-input').value;
-        const results = document.getElementById('search-results');
-        results.innerHTML = '';
-        
-        if (!query) return;
-        
-        let matches = 0;
-        
-        Object.entries(State.files).forEach(([path, content]) => {
-            const lines = content.split('\n');
-            lines.forEach((line, lineNum) => {
-                let match = false;
-                
-                if (this.options.regex) {
-                    try {
-                        const regex = new RegExp(query, this.options.case ? '' : 'i');
-                        match = regex.test(line);
-                    } catch (e) {
-                        return;
-                    }
-                } else {
-                    const searchText = this.options.case ? line : line.toLowerCase();
-                    const searchQuery = this.options.case ? query : query.toLowerCase();
-                    
-                    if (this.options.word) {
-                        const regex = new RegExp(`\\b${searchQuery}\\b`, 'i');
-                        match = regex.test(line);
-                    } else {
-                        match = searchText.includes(searchQuery);
-                    }
-                }
-                
-                if (match) {
-                    matches++;
-                    const item = document.createElement('div');
-                    item.className = 'search-result-item';
-                    
-                    const highlightedLine = line.replace(
-                        new RegExp(query, this.options.case ? 'g' : 'gi'),
-                        match => `<span class="search-match">${match}</span>`
-                    );
-                    
-                    item.innerHTML = `
-                        <div class="search-result-file">${path}:${lineNum + 1}</div>
-                        <div class="search-result-line">${highlightedLine}</div>
-                    `;
-                    
-                    item.onclick = () => {
-                        Tabs.open(path);
-                        setTimeout(() => {
-                            Editor.instance.revealLineInCenter(lineNum + 1);
-                            Editor.instance.setPosition({ lineNumber: lineNum + 1, column: 1 });
-                        }, 100);
-                    };
-                    
-                    results.appendChild(item);
-                }
-            });
-        });
-        
-        if (matches === 0) {
-            results.innerHTML = '<div style="padding:20px; text-align:center; color:#71717a;">No results found</div>';
-        }
-    }, 300),
-    
-    toggleOption(option) {
-        this.options[option] = !this.options[option];
-        const btn = document.querySelector(`[data-option="${option}"]`);
-        btn.classList.toggle('active');
-        this.perform();
-    },
-    
-    replace() {
-        const searchText = document.getElementById('search-input').value;
-        const replaceText = document.getElementById('replace-input').value;
-        
-        if (!searchText || !State.activeTab) return;
-        
-        const content = Editor.instance.getValue();
-        const newContent = content.replace(
-            new RegExp(searchText, 'g'),
-            replaceText
-        );
-        
-        Editor.instance.setValue(newContent);
-        Utils.toast('Replaced in current file', 'success');
-    }
-};
-
-// ═══════════════════════════════════════════════════════════════
-// SETTINGS MANAGEMENT
-// ═══════════════════════════════════════════════════════════════
-const Settings = {
-    toggle(setting, element) {
-        const isActive = element.classList.contains('active');
-        element.classList.toggle('active');
-        
-        State.settings[setting] = !isActive;
-        localStorage.setItem('procode_v14_settings', JSON.stringify(State.settings));
-        
-        // Apply settings
-        if (setting === 'minimap' && Editor.instance) {
-            Editor.instance.updateOptions({ minimap: { enabled: !isActive } });
-        } else if (setting === 'wordwrap' && Editor.instance) {
-            Editor.instance.updateOptions({ wordWrap: !isActive ? 'on' : 'off' });
-        }
-        
-        Utils.toast(`${setting} ${!isActive ? 'enabled' : 'disabled'}`, 'success');
-    },
-    
-    setFontSize(size) {
-        State.settings.fontSize = parseInt(size);
-        if (Editor.instance) {
-            Editor.instance.updateOptions({ fontSize: parseInt(size) });
-        }
-        localStorage.setItem('procode_v14_settings', JSON.stringify(State.settings));
-    },
-    
-    setTerminalFontSize(size) {
-        State.settings.terminalFontSize = parseInt(size);
-        if (Term.instance) {
-            Term.instance.options.fontSize = parseInt(size);
-        }
-        localStorage.setItem('procode_v14_settings', JSON.stringify(State.settings));
-    }
-};
-
-// ═══════════════════════════════════════════════════════════════
-// COMMAND PALETTE
-// ═══════════════════════════════════════════════════════════════
-const Command = {
-    commands: [
-        { id: 'save', name: 'Save File', icon: 'fa-save', key: 'Ctrl+S', action: () => FS.save() },
-        { id: 'run', name: 'Run Code', icon: 'fa-play', key: 'F5', action: () => Runner.exec() },
-        { id: 'format', name: 'Format Code', icon: 'fa-magic', key: 'Shift+Alt+F', action: () => Editor.format() },
-        { id: 'terminal', name: 'Toggle Terminal', icon: 'fa-terminal', key: 'Ctrl+`', action: () => Layout.toggleLayout('terminal') },
-        { id: 'preview', name: 'Toggle Preview', icon: 'fa-eye', key: 'Ctrl+B', action: () => Layout.toggleLayout('preview') },
-        { id: 'newfile', name: 'New File', icon: 'fa-file', action: () => FS.createFilePrompt() },
-        { id: 'export', name: 'Export Project', icon: 'fa-download', action: () => FS.exportZip() },
-        { id: 'import', name: 'Import Files', icon: 'fa-folder-open', action: () => FS.importPrompt() },
-        { id: 'search', name: 'Search in Files', icon: 'fa-search', key: 'Ctrl+Shift+F', action: () => Layout.setSide('search') },
-        { id: 'settings', name: 'Open Settings', icon: 'fa-cog', action: () => Layout.setSide('set') },
-        { id: 'ai', name: 'Open AI Assistant', icon: 'fa-robot', action: () => AI.toggle() }
-    ],
-    
-    selectedIndex: 0,
-    
-    filter(event) {
-        const input = event.target.value.toLowerCase();
-        const list = document.getElementById('cmd-list');
-        list.innerHTML = '';
-        
-        const filtered = this.commands.filter(cmd => 
-            cmd.name.toLowerCase().includes(input) ||
-            (cmd.key && cmd.key.toLowerCase().includes(input))
-        );
-        
-        filtered.forEach((cmd, index) => {
-            const item = document.createElement('div');
-            item.className = `cmd-item ${index === 0 ? 'selected' : ''}`;
-            item.innerHTML = `
-                <i class="fas ${cmd.icon}"></i>
-                <span class="cmd-name">${cmd.name}</span>
-                ${cmd.key ? `<span class="cmd-key">${cmd.key}</span>` : ''}
-            `;
-            item.onclick = () => {
-                cmd.action();
-                UI.closeCommandPalette();
-            };
-            list.appendChild(item);
-        });
-        
-        this.selectedIndex = 0;
-    },
-    
-    navigate(event) {
-        const items = document.querySelectorAll('.cmd-item');
-        
-        if (event.key === 'ArrowDown') {
-            event.preventDefault();
-            this.selectedIndex = Math.min(this.selectedIndex + 1, items.length - 1);
-            this.updateSelection(items);
-        } else if (event.key === 'ArrowUp') {
-            event.preventDefault();
-            this.selectedIndex = Math.max(this.selectedIndex - 1, 0);
-            this.updateSelection(items);
-        } else if (event.key === 'Enter') {
-            event.preventDefault();
-            items[this.selectedIndex]?.click();
-        } else if (event.key === 'Escape') {
-            UI.closeCommandPalette();
-        }
-    },
-    
-    updateSelection(items) {
-        items.forEach((item, index) => {
-            item.classList.toggle('selected', index === this.selectedIndex);
-        });
-        items[this.selectedIndex]?.scrollIntoView({ block: 'nearest' });
-    },
-    
-    run(id) {
-        const cmd = this.commands.find(c => c.id === id);
-        if (cmd) cmd.action();
-    }
-};
-
-// ═══════════════════════════════════════════════════════════════
-// CONTEXT MENU
-// ═══════════════════════════════════════════════════════════════
-const ContextMenu = {
-    show(event, items) {
-        // Remove existing menu
-        const existing = document.querySelector('.context-menu');
-        if (existing) existing.remove();
-        
-        const menu = document.createElement('div');
-        menu.className = 'context-menu';
-        menu.style.left = event.clientX + 'px';
-        menu.style.top = event.clientY + 'px';
-        
-        items.forEach(item => {
-            if (item === 'divider') {
-                const div = document.createElement('div');
-                div.className = 'ctx-divider';
-                menu.appendChild(div);
-            } else {
-                const el = document.createElement('div');
-                el.className = 'ctx-item';
-                el.innerHTML = `<i class="fas ${item.icon}"></i> ${item.label}`;
-                el.onclick = () => {
-                    item.action();
-                    menu.remove();
-                };
-                menu.appendChild(el);
-            }
-        });
-        
-        document.body.appendChild(menu);
-        
-        // Close on click outside
-        setTimeout(() => {
-            document.addEventListener('click', () => menu.remove(), { once: true });
-        }, 0);
-    }
-};
-
-// ═══════════════════════════════════════════════════════════════
-// UI UTILITIES
-// ═══════════════════════════════════════════════════════════════
-const UI = {
-    showCommandPalette() {
-        const palette = document.getElementById('cmd-palette');
-        palette.classList.add('active');
-        
-        const input = document.getElementById('cmd-input');
-        input.value = '';
-        input.focus();
-        
-        // Initial render
-        Command.filter({ target: input });
-    },
-    
-    closeCommandPalette() {
-        document.getElementById('cmd-palette').classList.remove('active');
-    },
-    
-    showModal(title, content, buttons = []) {
-        const overlay = document.getElementById('modal-overlay');
-        const modal = document.getElementById('modal-content');
-        
-        const buttonHTML = buttons.map(btn => 
-            `<button class="${btn.class}" onclick="${btn.action ? 'this.modalAction()' : 'UI.closeModal()'}">${btn.label}</button>`
-        ).join('');
-        
-        modal.innerHTML = `
-            <div class="modal-header">
-                <span>${title}</span>
-                <i class="fas fa-times" style="cursor:pointer;" onclick="UI.closeModal()"></i>
-            </div>
-            <div class="modal-body">${content}</div>
-            <div class="modal-footer">${buttonHTML}</div>
-        `;
-        
-        // Attach actions
-        buttons.forEach((btn, i) => {
-            if (btn.action) {
-                modal.querySelectorAll('button')[i].modalAction = btn.action;
-            }
-        });
-        
-        overlay.classList.add('active');
-    },
-    
-    closeModal() {
-        document.getElementById('modal-overlay').classList.remove('active');
-    },
-    
-    showAbout() {
-        this.showModal('About Pro Code IDE', `
-            <div style="text-align:center; padding:20px;">
-                <div style="font-size:48px; margin-bottom:16px;">💻</div>
-                <h2 style="margin-bottom:8px;">Pro Code IDE v14.0</h2>
-                <p style="color:#71717a; margin-bottom:24px;">Ultimate Edition</p>
-                
-                <div style="text-align:left; background:#0f0f11; padding:16px; border-radius:8px; margin-bottom:16px;">
-                    <div style="margin-bottom:8px;"><strong>Features:</strong></div>
-                    <ul style="color:#a1a1aa; font-size:13px; line-height:1.8;">
-                        <li>Monaco Editor with IntelliSense</li>
-                        <li>Multi-language support (JS, React, Python, HTML, CSS)</li>
-                        <li>Integrated Terminal</li>
-                        <li>Live Preview with Hot Reload</li>
-                        <li>Code Formatting (Prettier)</li>
-                        <li>Search & Replace</li>
-                        <li>AI Assistant</li>
-                        <li>File Management & Export</li>
-                    </ul>
-                </div>
-                
-                <div style="font-size:12px; color:#71717a;">
-                    Built with love using Monaco Editor, XTerm.js, Babel, and more
-                </div>
-            </div>
-        `, [{ label: 'Close', class: 'btn primary' }]);
-    },
-    
-    showNotifications() {
-        Utils.toast('No new notifications', 'info');
-    }
-};
-
-// ═══════════════════════════════════════════════════════════════
-// AI ASSISTANT
-// ═══════════════════════════════════════════════════════════════
+// 7. AI SYSTEM (Mockup + Structure)
 const AI = {
     visible: false,
-    minimized: false,
-    
     toggle() {
-        const widget = document.getElementById('ai-float');
+        const ui = document.getElementById('ai-float');
         this.visible = !this.visible;
-        widget.style.display = this.visible ? 'flex' : 'none';
-        
-        if (this.visible) {
-            document.getElementById('ai-input').focus();
-            this.minimized = false;
-        }
+        ui.style.display = this.visible ? 'flex' : 'none';
+        if(this.visible) document.getElementById('ai-input').focus();
     },
-    
-    minimize() {
-        // Toggle height
-        this.minimized = !this.minimized;
-        const widget = document.getElementById('ai-float');
-        widget.style.height = this.minimized ? '44px' : '600px';
-        document.getElementById('ai-messages').style.display = this.minimized ? 'none' : 'flex';
-        document.querySelector('.ai-input-wrapper').style.display = this.minimized ? 'none' : 'flex';
-    },
-    
     send() {
-        const input = document.getElementById('ai-input');
-        const text = input.value.trim();
-        if (!text) return;
+        const inp = document.getElementById('ai-input');
+        const txt = inp.value;
+        if(!txt) return;
         
-        this.addMessage(text, 'user');
-        input.value = '';
+        this.addMsg(txt, 'user');
+        inp.value = '';
         
-        // Simulate AI response
+        // Simulated Logic Response
         setTimeout(() => {
-            let response = this.generateResponse(text);
-            this.addMessage(response, 'sys');
+            let reply = "I can verify your syntax and logic.";
+            if (txt.includes('error') || txt.includes('debug')) {
+                reply = "I checked your code. You seem to be missing a semicolon in line 24. \n\nTry:\n`const x = 10;`";
+            } else if (txt.includes('create') && txt.includes('react')) {
+                reply = "Sure, here is a Functional Component:\n\n```jsx\nexport const Btn = () => <button>Click</button>\n```";
+            }
+            this.addMsg(reply, 'sys');
         }, 1000);
     },
-    
-    generateResponse(query) {
-        const lower = query.toLowerCase();
-        
-        if (lower.includes('error') || lower.includes('debug') || lower.includes('fix')) {
-            return `I can help you debug! Common issues to check:
-
-• Syntax errors (missing semicolons, brackets)
-• Undefined variables or functions
-• Import/export mismatches
-• Async/await usage
-
-Could you share the error message or code snippet?`;
-        }
-        
-        if (lower.includes('react') && lower.includes('component')) {
-            return `Here's a React component template:
-
-\`\`\`jsx
-import React, { useState } from 'react';
-
-export default function MyComponent() {
-  const [state, setState] = useState(0);
-  
-  return (
-    <div>
-      <h1>Hello!</h1>
-      <button onClick={() => setState(state + 1)}>
-        Count: {state}
-      </button>
-    </div>
-  );
-}
-\`\`\`
-
-Would you like me to explain any part?`;
-        }
-        
-        if (lower.includes('optimize') || lower.includes('performance')) {
-            return `Performance optimization tips:
-
-1. Use React.memo() for expensive components
-2. Implement lazy loading with React.lazy()
-3. Debounce expensive operations
-4. Use useMemo() and useCallback() hooks
-5. Minimize re-renders
-
-Which specific aspect would you like to optimize?`;
-        }
-        
-        if (lower.includes('css') || lower.includes('style')) {
-            return `For styling, you have several options:
-
-• **Inline styles**: Direct style prop
-• **CSS Modules**: Scoped CSS files
-• **Tailwind**: Utility-first CSS
-• **Styled Components**: CSS-in-JS
-
-What's your preferred styling approach?`;
-        }
-        
-        return `I'm here to help! I can assist with:
-
-✓ Debugging code errors
-✓ Generating React components
-✓ Explaining concepts
-✓ Code optimization
-✓ Best practices
-
-What would you like help with?`;
-    },
-    
-    addMessage(text, type) {
-        const container = document.getElementById('ai-messages');
-        const bubble = document.createElement('div');
+    addMsg(text, type) {
+        const c = document.getElementById('ai-messages');
+        const div = document.createElement('div');
         
         if (text.includes('```')) {
-            const parts = text.split('```');
-            let html = '';
-            
-            parts.forEach((part, i) => {
-                if (i % 2 === 0) {
-                    html += `<div class="msg-bubble ${type === 'user' ? 'msg-user' : 'msg-sys'}">${part}</div>`;
-                } else {
-                    const lang = part.split('\n')[0];
-                    const code = part.split('\n').slice(1).join('\n');
-                    html += `<div class="code-block">${code}</div>`;
-                }
-            });
-            
-            bubble.innerHTML = html;
+             // Handle simple markdown code block
+             const parts = text.split('```');
+             let html = "";
+             parts.forEach((p, i) => {
+                 if (i % 2 === 0) html += `<div class="msg-bubble ${type=='user'?'msg-user':'msg-sys'}">${p}</div>`;
+                 else html += `<div class="code-block">${p.replace(/jsx|js|html/, '').trim()}</div>`;
+             });
+             div.innerHTML = html;
+             c.appendChild(div);
         } else {
-            bubble.className = `msg-bubble ${type === 'user' ? 'msg-user' : 'msg-sys'}`;
-            bubble.textContent = text;
+             div.className = `msg-bubble ${type=='user'?'msg-user':'msg-sys'}`;
+             div.textContent = text;
+             c.appendChild(div);
         }
-        
-        container.appendChild(bubble);
-        container.scrollTop = container.scrollHeight;
+        c.scrollTop = c.scrollHeight;
     }
 };
 
-// Make AI widget draggable
-function makeAIDraggable() {
-    const widget = document.getElementById('ai-float');
-    const header = document.getElementById('ai-drag-handle');
-    
-    let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
-    
-    header.onmousedown = (e) => {
-        e.preventDefault();
-        pos3 = e.clientX;
-        pos4 = e.clientY;
-        
-        document.onmousemove = (e) => {
-            e.preventDefault();
-            pos1 = pos3 - e.clientX;
-            pos2 = pos4 - e.clientY;
-            pos3 = e.clientX;
-            pos4 = e.clientY;
-            
-            widget.style.top = (widget.offsetTop - pos2) + 'px';
-            widget.style.left = (widget.offsetLeft - pos1) + 'px';
-            widget.style.right = 'auto';
-            widget.style.bottom = 'auto';
-        };
-        
-        document.onmouseup = () => {
-            document.onmousemove = null;
-            document.onmouseup = null;
-        };
-    };
-}
-
-// ═══════════════════════════════════════════════════════════════
 // RESIZERS
-// ═══════════════════════════════════════════════════════════════
 function initResizers() {
     const makeResizer = (resizerId, targetId, direction, invert) => {
         const resizer = document.getElementById(resizerId);
@@ -3031,7 +950,6 @@ function initResizers() {
             e.preventDefault();
             resizer.classList.add('dragging');
             document.body.style.cursor = direction === 'w' ? 'col-resize' : 'row-resize';
-            document.body.style.userSelect = 'none';
             
             const startX = e.clientX;
             const startY = e.clientY;
@@ -3041,14 +959,13 @@ function initResizers() {
             const onMove = (e) => {
                 if (direction === 'w') {
                     const diff = invert ? (startX - e.clientX) : (e.clientX - startX);
-                    target.style.width = Math.max(200, startW + diff) + 'px';
+                    target.style.width = (startW + diff) + 'px';
                 } else {
                     const diff = invert ? (startY - e.clientY) : (e.clientY - startY);
-                    target.style.height = Math.max(150, startH - diff) + 'px';
+                    target.style.height = (startH - diff) + 'px';
                 }
-                
-                if (Editor.instance) Editor.instance.layout();
-                if (Term.fit) Term.fit.fit();
+                if(Editor.instance) Editor.instance.layout();
+                if(Term.fit) Term.fit.fit();
             };
             
             const onUp = () => {
@@ -3056,137 +973,63 @@ function initResizers() {
                 window.removeEventListener('mouseup', onUp);
                 resizer.classList.remove('dragging');
                 document.body.style.cursor = 'default';
-                document.body.style.userSelect = 'auto';
             };
             
             window.addEventListener('mousemove', onMove);
             window.addEventListener('mouseup', onUp);
         });
-    };
+    }
     
     makeResizer('rs-side', 'side-expl', 'w', false);
-    makeResizer('rs-panel', 'panel-btm', 'h', true);
+    makeResizer('rs-panel', 'panel-btm', 'h', true); // Height grows upwards
 }
 
-// ═══════════════════════════════════════════════════════════════
-// MESSAGE LISTENER (Preview Frame Communication)
-// ═══════════════════════════════════════════════════════════════
+// MESSAGE LISTENER (From Preview Iframe)
 window.addEventListener('message', (e) => {
-    if (e.data.type === 'console') {
-        Console.log(e.data.args.join(' '), e.data.level);
-    } else if (e.data.type === 'error') {
-        Console.log(`${e.data.message} (Line ${e.data.line})`, 'error');
+    if(e.data.type === 'log') {
+        const host = document.getElementById('console-host');
+        const l = document.createElement('div');
+        l.style = "border-bottom:1px solid #333; padding:4px 0; color:#e4e4e7;";
+        l.textContent = "> " + e.data.args.join(' ');
+        host.appendChild(l);
+        host.scrollTop = host.scrollHeight;
     }
 });
 
-// ═══════════════════════════════════════════════════════════════
-// GLOBAL KEYBOARD SHORTCUTS
-// ═══════════════════════════════════════════════════════════════
-document.addEventListener('keydown', (e) => {
-    // Ctrl+S - Save
-    if (e.ctrlKey && e.key === 's') {
-        e.preventDefault();
-        Command.run('save');
-    }
-    // F5 - Run
-    else if (e.key === 'F5') {
-        e.preventDefault();
-        Command.run('run');
-    }
-    // Ctrl+Shift+P - Command Palette
-    else if (e.ctrlKey && e.shiftKey && e.key === 'P') {
-        e.preventDefault();
-        UI.showCommandPalette();
-    }
-    // Escape - Close modals/palettes
-    else if (e.key === 'Escape') {
-        UI.closeCommandPalette();
-        UI.closeModal();
-    }
-    // Ctrl+B - Toggle Preview
-    else if (e.ctrlKey && e.key === 'b') {
-        e.preventDefault();
-        Command.run('preview');
-    }
-    // Ctrl+` - Toggle Terminal
-    else if (e.ctrlKey && e.key === '`') {
-        e.preventDefault();
-        Command.run('terminal');
-    }
-    // Ctrl+Shift+F - Search
-    else if (e.ctrlKey && e.shiftKey && e.key === 'F') {
-        e.preventDefault();
-        Command.run('search');
-    }
-});
-
-// Close command palette on click outside
-document.addEventListener('click', (e) => {
-    const palette = document.getElementById('cmd-palette');
-    if (palette.classList.contains('active') && !palette.contains(e.target)) {
-        UI.closeCommandPalette();
-    }
-});
-
-// ═══════════════════════════════════════════════════════════════
 // INITIALIZATION SEQUENCE
-// ═══════════════════════════════════════════════════════════════
 window.onload = async () => {
     try {
-        document.getElementById('boot-status').textContent = 'LOADING FILE SYSTEM...';
         await FS.init();
-        
-        document.getElementById('boot-status').textContent = 'INITIALIZING EDITOR...';
         await Editor.init();
-        
-        document.getElementById('boot-status').textContent = 'STARTING TERMINAL...';
         Term.init();
-        
-        document.getElementById('boot-status').textContent = 'FINALIZING...';
         initResizers();
-        makeAIDraggable();
         
-        // Auto-open first file
+        // Auto-Open default
         const entry = Object.keys(State.files)[0];
-        if (entry) {
-            Tabs.open(entry);
-        }
+        if(entry) Tabs.open(entry);
         
-        // Drag & Drop handling
+        // Drag Drop Handling
         document.body.ondragover = e => e.preventDefault();
-        document.body.ondrop = async (e) => {
-            e.preventDefault();
-            
-            if (e.dataTransfer.items) {
-                const items = Array.from(e.dataTransfer.items);
-                for (const item of items) {
-                    if (item.kind === 'file') {
-                        const file = item.getAsFile();
-                        const text = await file.text();
-                        FS.write(file.name, text);
-                    }
-                }
-                FS.refreshTree();
-                Utils.toast(`Imported ${items.length} file(s)`, 'success');
+        document.body.ondrop = e => { 
+            e.preventDefault(); 
+            // Simple file text drop
+            if(e.dataTransfer.items) {
+                 [...e.dataTransfer.items].forEach(async (item) => {
+                     if (item.kind === 'file') {
+                         const file = item.getAsFile();
+                         const text = await file.text();
+                         FS.write(file.name, text);
+                         FS.refreshTree();
+                         Utils.toast(`Dropped: ${file.name}`);
+                     }
+                 });
             }
         };
         
-        // Prevent accidental page close
-        window.onbeforeunload = (e) => {
-            const dirtyTabs = document.querySelectorAll('.tab.dirty');
-            if (dirtyTabs.length > 0) {
-                e.preventDefault();
-                e.returnValue = '';
-                return '';
-            }
-        };
+        Utils.toast("Ready for coding!");
         
-        console.log('%c🚀 Pro Code IDE v14.0 Ready!', 'color: #6366f1; font-size: 16px; font-weight: bold;');
-        console.log('%cType Command.commands to see all available commands', 'color: #a1a1aa;');
-        
-    } catch (error) {
-        alert("Critical initialization error: " + error.message);
-        console.error(error);
+    } catch(e) {
+        alert("Critial Init Error: " + e);
     }
 };
 
