@@ -2825,6 +2825,125 @@ export default function Counter() {
     }
 };
 
+// THÊM VÀO IndexedDBManager object
+class IndexedDBBatcher {
+    constructor(db) {
+        this.db = db;
+        this.writeQueue = new Map();
+        this.deleteQueue = new Set();
+        this.flushTimer = null;
+        this.isProcessing = false;
+        this.BATCH_DELAY = 500; // ms
+        this.MAX_BATCH_SIZE = 100;
+    }
+    
+    queueWrite(key, value) {
+        this.deleteQueue.delete(key);
+        this.writeQueue.set(key, value);
+        this.scheduleFlush();
+    }
+    
+    queueDelete(key) {
+        this.writeQueue.delete(key);
+        this.deleteQueue.add(key);
+        this.scheduleFlush();
+    }
+    
+    scheduleFlush() {
+        if (this.flushTimer) clearTimeout(this.flushTimer);
+        
+        const shouldFlushImmediately = 
+            this.writeQueue.size >= this.MAX_BATCH_SIZE || 
+            this.deleteQueue.size >= this.MAX_BATCH_SIZE;
+        
+        if (shouldFlushImmediately) {
+            this.flush();
+        } else {
+            this.flushTimer = setTimeout(() => this.flush(), this.BATCH_DELAY);
+        }
+    }
+    
+    async flush() {
+        if (this.isProcessing) return;
+        if (this.writeQueue.size === 0 && this.deleteQueue.size === 0) return;
+        
+        this.isProcessing = true;
+        const writes = Array.from(this.writeQueue.entries());
+        const deletes = Array.from(this.deleteQueue);
+        
+        this.writeQueue.clear();
+        this.deleteQueue.clear();
+        
+        try {
+            // ✅ Sử dụng transaction duy nhất cho tất cả operations
+            const transaction = this.db.transaction(['files', 'settings'], 'readwrite');
+            const fileStore = transaction.objectStore('files');
+            
+            // Batch writes
+            const writePromises = writes.map(([path, content]) => 
+                new Promise((resolve, reject) => {
+                    const request = fileStore.put({
+                        path,
+                        content,
+                        size: new Blob([content]).size,
+                        modified: Date.now()
+                    });
+                    request.onsuccess = resolve;
+                    request.onerror = reject;
+                })
+            );
+            
+            // Batch deletes
+            const deletePromises = deletes.map(path =>
+                new Promise((resolve, reject) => {
+                    const request = fileStore.delete(path);
+                    request.onsuccess = resolve;
+                    request.onerror = reject;
+                })
+            );
+            
+            await Promise.all([...writePromises, ...deletePromises]);
+            
+            // ✅ Chờ transaction complete
+            await new Promise((resolve, reject) => {
+                transaction.oncomplete = resolve;
+                transaction.onerror = reject;
+            });
+            
+            console.log(`✅ Flushed ${writes.length} writes, ${deletes.length} deletes`);
+        } catch (error) {
+            console.error('❌ Batch flush failed:', error);
+            // ✅ Re-queue failed operations
+            writes.forEach(([k, v]) => this.writeQueue.set(k, v));
+            deletes.forEach(k => this.deleteQueue.add(k));
+            
+            // Retry after delay
+            setTimeout(() => this.flush(), 5000);
+        } finally {
+            this.isProcessing = false;
+        }
+    }
+}
+
+// THÊM vào IndexedDBManager.init()
+async init() {
+    const db = await /* existing init code */;
+    this.db = db;
+    this.batcher = new IndexedDBBatcher(db); // ✅ NEW
+    return db;
+},
+
+// THAY ĐỔI các methods
+async setFile(path, content) {
+    if (!this.db) await this.init();
+    this.batcher.queueWrite(path, content); // ✅ Sử dụng batcher
+},
+
+async deleteFile(path) {
+    if (!this.db) await this.init();
+    this.batcher.queueDelete(path); // ✅ Sử dụng batcher
+},
+
 // ============================================
 // INDEXED DB MANAGER (Better than localStorage)
 // ============================================
@@ -3605,6 +3724,109 @@ const Utils = {
     }
 };
 
+// THÊM VÀO FileSystem object
+class SmartAutoSave {
+    constructor() {
+        this.pendingChanges = new Map();
+        this.saveTimer = null;
+        this.MIN_INTERVAL = 1000; // 1s
+        this.MAX_INTERVAL = 5000; // 5s
+        this.lastSaveTime = 0;
+        this.changeCount = 0;
+    }
+    
+    queueChange(path, content) {
+        this.pendingChanges.set(path, content);
+        this.changeCount++;
+        
+        // Clear existing timer
+        if (this.saveTimer) {
+            clearTimeout(this.saveTimer);
+        }
+        
+        const now = Date.now();
+        const timeSinceLastSave = now - this.lastSaveTime;
+        
+        // ✅ Adaptive delay based on activity
+        let delay = this.MIN_INTERVAL;
+        if (this.changeCount > 10) {
+            // Rapid changes - wait longer
+            delay = this.MAX_INTERVAL;
+        } else if (timeSinceLastSave < this.MIN_INTERVAL * 2) {
+            // Recent save - wait a bit
+            delay = this.MIN_INTERVAL * 1.5;
+        }
+        
+        this.saveTimer = setTimeout(() => this.flush(), delay);
+    }
+    
+    async flush() {
+        if (this.pendingChanges.size === 0) return;
+        
+        const changes = Array.from(this.pendingChanges.entries());
+        this.pendingChanges.clear();
+        this.changeCount = 0;
+        this.lastSaveTime = Date.now();
+        
+        try {
+            // Batch save
+            for (const [path, content] of changes) {
+                IDE.state.files[path] = content;
+                await IndexedDBManager.setFile(path, content);
+            }
+            
+            console.log(`💾 Auto-saved ${changes.length} file(s)`);
+        } catch (error) {
+            console.error('Auto-save failed:', error);
+            // Re-queue failed changes
+            changes.forEach(([path, content]) => {
+                this.pendingChanges.set(path, content);
+            });
+        }
+    }
+    
+    forceFlush() {
+        if (this.saveTimer) {
+            clearTimeout(this.saveTimer);
+        }
+        return this.flush();
+    }
+}
+
+// Khởi tạo
+FileSystem.autoSave = new SmartAutoSave();
+
+// Sử dụng trong FileSystem.write
+write: function(path, content, options = {}) {
+    const oldContent = IDE.state.files[path];
+    const isNewFile = !this.exists(path);
+    
+    if (!options.skipHistory && oldContent !== content) {
+        this.addToHistory('write', path, oldContent, content);
+    }
+    
+    IDE.state.files[path] = content;
+    
+    // ✅ Sử dụng smart auto-save
+    if (IDE.state.settings.editor.autoSave && !options.skipAutoSave) {
+        this.autoSave.queueChange(path, content);
+    }
+    
+    if (IDE.state.tabs.includes(path)) {
+        IDE.state.dirtyTabs.add(path);
+        this.updateTabDirtyState();
+    }
+    
+    if (IDE.state.activeTab === path) {
+        this.updateOutline();
+    }
+    
+    this.updateFileSystemMetrics();
+    this.emitFileChange(path, isNewFile ? 'created' : 'modified');
+    
+    return true;
+},
+
 // ============================================
 // ENHANCED FILE SYSTEM MANAGER
 // ============================================
@@ -4177,22 +4399,33 @@ refreshTree: function() {
         this.renderFileTree(tree);
     }
 },
-// Thêm vào FileSystem object
+// THAY THẾ FileSystem.renderFileTreeVirtual
 renderFileTreeVirtual: function(container) {
     const allFiles = this.buildFileStructure();
     const flattenedItems = this.flattenFileStructure(allFiles);
     
-    // Virtual scrolling configuration - OPTIMIZED
+    // ✅ FIX: Giảm buffer size, tăng hiệu suất
     const itemHeight = 28;
     const containerHeight = container.clientHeight;
     const visibleCount = Math.ceil(containerHeight / itemHeight);
-    const bufferSize = 10; // Tăng buffer để scroll mượt hơn
+    const bufferSize = 5; // Giảm từ 10 xuống 5
     
     let scrollTop = 0;
     let startIndex = 0;
     let endIndex = visibleCount + bufferSize;
+    let animationFrameId = null;
+    let renderCache = new Map();
+    let lastStartIndex = -1;
     
-    // Create containers
+    // ✅ NEW: Pooling pattern để tái sử dụng DOM nodes
+    const nodePool = [];
+    const getNodeFromPool = () => {
+        return nodePool.pop() || this.createFileTreeItem({ type: 'placeholder' }, 0);
+    };
+    const returnNodeToPool = (node) => {
+        if (nodePool.length < 50) nodePool.push(node);
+    };
+    
     const scrollContainer = document.createElement('div');
     scrollContainer.style.height = `${flattenedItems.length * itemHeight}px`;
     scrollContainer.style.position = 'relative';
@@ -4202,20 +4435,16 @@ renderFileTreeVirtual: function(container) {
     visibleContainer.style.top = '0';
     visibleContainer.style.left = '0';
     visibleContainer.style.right = '0';
-    visibleContainer.style.willChange = 'transform'; // GPU acceleration
-    
-    // Render cache để tránh re-render không cần thiết
-    let renderCache = new Map();
-    let lastStartIndex = -1;
-    let animationFrameId = null;
+    visibleContainer.style.willChange = 'transform';
+    visibleContainer.style.contain = 'layout style paint'; // ✅ NEW: CSS containment
     
     const renderVisibleItems = () => {
-        if (startIndex === lastStartIndex && renderCache.size > 0) {
-            return; // Không cần render lại
-        }
+        if (startIndex === lastStartIndex && renderCache.size > 0) return;
         
+        // ✅ FIX: Batch DOM operations
         const fragment = document.createDocumentFragment();
-        const itemsToRender = [];
+        const existingNodes = Array.from(visibleContainer.children);
+        const nodesToKeep = new Set();
         
         for (let i = startIndex; i < Math.min(endIndex, flattenedItems.length); i++) {
             const item = flattenedItems[i];
@@ -4229,37 +4458,45 @@ renderFileTreeVirtual: function(container) {
                 element.style.top = `${i * itemHeight}px`;
             }
             
-            itemsToRender.push(element);
+            nodesToKeep.add(element);
+            fragment.appendChild(element.cloneNode(true));
         }
         
-        // Clear và append
-        visibleContainer.innerHTML = '';
-        itemsToRender.forEach(el => fragment.appendChild(el.cloneNode(true)));
-        visibleContainer.appendChild(fragment);
+        // ✅ FIX: Cleanup unused nodes
+        existingNodes.forEach(node => {
+            if (!nodesToKeep.has(node)) {
+                returnNodeToPool(node);
+            }
+        });
         
+        visibleContainer.innerHTML = '';
+        visibleContainer.appendChild(fragment);
         lastStartIndex = startIndex;
         
-        // Cleanup cache (giữ chỉ visible items + buffer)
-        if (renderCache.size > (visibleCount + bufferSize * 2) * 2) {
+        // ✅ FIX: Smart cache cleanup
+        if (renderCache.size > visibleCount * 3) {
             const keysToKeep = new Set();
-            for (let i = Math.max(0, startIndex - bufferSize); 
-                 i < Math.min(flattenedItems.length, endIndex + bufferSize); i++) {
+            const rangeStart = Math.max(0, startIndex - bufferSize * 2);
+            const rangeEnd = Math.min(flattenedItems.length, endIndex + bufferSize * 2);
+            
+            for (let i = rangeStart; i < rangeEnd; i++) {
                 keysToKeep.add(`${flattenedItems[i].path}-${i}`);
             }
             
             for (const key of renderCache.keys()) {
-                if (!keysToKeep.has(key)) {
-                    renderCache.delete(key);
-                }
+                if (!keysToKeep.has(key)) renderCache.delete(key);
             }
         }
     };
     
-    // Optimized scroll handler với RAF
+    // ✅ FIX: Throttled scroll với RAF
+    let lastScrollTime = 0;
     const handleScroll = () => {
-        if (animationFrameId) {
-            cancelAnimationFrame(animationFrameId);
-        }
+        const now = performance.now();
+        if (now - lastScrollTime < 16) return; // Throttle to ~60fps
+        lastScrollTime = now;
+        
+        if (animationFrameId) cancelAnimationFrame(animationFrameId);
         
         animationFrameId = requestAnimationFrame(() => {
             scrollTop = container.scrollTop;
@@ -4269,28 +4506,25 @@ renderFileTreeVirtual: function(container) {
             if (newStartIndex !== startIndex || newEndIndex !== endIndex) {
                 startIndex = newStartIndex;
                 endIndex = newEndIndex;
-                visibleContainer.style.transform = `translateY(${startIndex * itemHeight}px)`;
+                visibleContainer.style.transform = `translate3d(0, ${startIndex * itemHeight}px, 0)`; // ✅ Use translate3d
                 renderVisibleItems();
             }
         });
     };
     
-    // Passive listener cho performance
+    // ✅ FIX: Passive listener
     container.addEventListener('scroll', handleScroll, { passive: true });
     
     scrollContainer.appendChild(visibleContainer);
     container.appendChild(scrollContainer);
-    
-    // Initial render
     renderVisibleItems();
     
-    // Cleanup function
+    // ✅ NEW: Cleanup function
     container._cleanupVirtualScroll = () => {
         container.removeEventListener('scroll', handleScroll);
-        if (animationFrameId) {
-            cancelAnimationFrame(animationFrameId);
-        }
+        if (animationFrameId) cancelAnimationFrame(animationFrameId);
         renderCache.clear();
+        nodePool.length = 0;
     };
 },
 
@@ -5930,43 +6164,83 @@ const EditorManager = {
     diagnostics: new Map(),
     codeLenses: new Map(),
 
-    // ✅ Editor engine init (deep-fixed)
+    // THAY THẾ EditorManager.init()
     init: async function() {
         console.log('🧠 Initializing editor engine...');
-
-        // Wait for Monaco to be ready (loaded via CDN)
-        await new Promise((resolve, reject) => {
-            const start = Date.now();
-            (function tick() {
-                if (window.monaco && monaco.editor) return resolve();
-                if (Date.now() - start > 15000) return reject(new Error('Monaco editor failed to load'));
-                requestAnimationFrame(tick);
-            })();
-        });
-
-        try { this.defineEnhancedThemes(); } catch (e) { console.warn(e); }
-
-        // Create the primary editor instance
-        this.createEditor(this.currentEditorId);
-
-        // Enhance editor UX (best-effort)
-        try { this.addCustomCommands(); } catch (e) { /* ignore */ }
-        try { this.setupEnhancedEventListeners(); } catch (e) { /* ignore */ }
-        try { if (this.setupCodeLens) this.setupCodeLens(); } catch (e) { /* ignore */ }
-
-        // Worker for heavy tasks
-        try { if (this.initWebWorker) this.initWebWorker(); } catch (e) { /* ignore */ }
-
-        // Load initial file into editor
+        
+        // ✅ FIX: Better Monaco loading với timeout và retry
+        const loadMonaco = async (retries = 3) => {
+            for (let i = 0; i < retries; i++) {
+                try {
+                    await new Promise((resolve, reject) => {
+                        const timeout = setTimeout(() => {
+                            reject(new Error('Monaco load timeout'));
+                        }, 15000);
+                        
+                        const check = () => {
+                            if (window.monaco && monaco.editor) {
+                                clearTimeout(timeout);
+                                resolve();
+                            } else if (window.__MONACO_READY__ === false) {
+                                clearTimeout(timeout);
+                                reject(new Error('Monaco failed to load'));
+                            } else {
+                                requestAnimationFrame(check);
+                            }
+                        };
+                        check();
+                    });
+                    return; // Success
+                } catch (error) {
+                    console.warn(`Monaco load attempt ${i + 1} failed:`, error);
+                    if (i === retries - 1) throw error;
+                    await new Promise(resolve => setTimeout(resolve, 2000)); // Wait before retry
+                }
+            }
+        };
+        
+        await loadMonaco();
+        
         try {
-            const initial = IDE.state.activeTab || (IDE.state.tabs && IDE.state.tabs[0]) || Object.keys(IDE.state.files || {})[0];
+            this.defineEnhancedThemes();
+        } catch (e) {
+            console.warn('Theme definition failed:', e);
+        }
+        
+        // ✅ FIX: Ensure container exists
+        const container = document.getElementById(this.currentEditorId);
+        if (!container) {
+            throw new Error(`Editor container ${this.currentEditorId} not found`);
+        }
+        
+        this.createEditor(this.currentEditorId);
+        
+        try {
+            this.addCustomCommands();
+            this.setupEnhancedEventListeners();
+            if (this.setupCodeLens) this.setupCodeLens();
+        } catch (e) {
+            console.warn('Enhanced features setup failed:', e);
+        }
+        
+        try {
+            if (this.initWebWorker) this.initWebWorker();
+        } catch (e) {
+            console.warn('Worker init failed:', e);
+        }
+        
+        // ✅ FIX: Load initial file với error handling
+        try {
+            const initial = IDE.state.activeTab || 
+                           (IDE.state.tabs && IDE.state.tabs[0]) || 
+                           Object.keys(IDE.state.files || {})[0];
             if (initial && FileSystem.exists(initial)) {
                 this.setFile(initial, this.currentEditorId);
             }
         } catch (e) {
             console.warn('Failed to set initial file:', e);
         }
-
+        
         console.log('✅ Editor engine ready');
     },
 
@@ -8056,18 +8330,50 @@ const TerminalManager = {
         terminal.instance.write(`\x1b[1;32muser@procode\x1b[0m:\x1b[1;34m${path}\x1b[0m$ `);
     },
     
+    // THAY THẾ TerminalManager.setupInput
     setupInput: function(terminalId) {
         const terminal = this.terminals[terminalId];
         if (!terminal) return;
         
         let currentInput = '';
-        let isProcessing = false;
+        let cursorPosition = 0; // ✅ NEW: Track cursor position
+        
+        // ✅ FIX: Better input handling
+        const insertAtCursor = (text) => {
+            const before = currentInput.slice(0, cursorPosition);
+            const after = currentInput.slice(cursorPosition);
+            currentInput = before + text + after;
+            cursorPosition += text.length;
+        };
+        
+        const deleteAtCursor = (count = 1) => {
+            if (cursorPosition === 0) return;
+            const before = currentInput.slice(0, cursorPosition - count);
+            const after = currentInput.slice(cursorPosition);
+            currentInput = before + after;
+            cursorPosition -= count;
+        };
+        
+        const moveCursor = (delta) => {
+            cursorPosition = Math.max(0, Math.min(currentInput.length, cursorPosition + delta));
+        };
+        
+        const redrawLine = () => {
+            // Clear line and redraw with cursor
+            terminal.instance.write('\r\x1b[K');
+            this.writePrompt(terminalId);
+            terminal.instance.write(currentInput);
+            
+            // Move cursor to correct position
+            const promptLen = terminal.currentDir.length + 15; // Approximate
+            const targetCol = promptLen + cursorPosition + 1;
+            terminal.instance.write(`\x1b[${targetCol}G`);
+        };
         
         terminal.instance.onKey(({ key, domEvent }) => {
-            if (isProcessing) return;
-            
             const printable = !domEvent.altKey && !domEvent.ctrlKey && !domEvent.metaKey;
             
+            // ✅ FIX: Better key handling
             switch (domEvent.keyCode) {
                 case 13: // Enter
                     terminal.instance.write('\r\n');
@@ -8075,39 +8381,69 @@ const TerminalManager = {
                     terminal.commandHistory.push(currentInput);
                     terminal.historyIndex = terminal.commandHistory.length;
                     currentInput = '';
+                    cursorPosition = 0;
                     break;
                     
                 case 8: // Backspace
-                    if (currentInput.length > 0) {
-                        terminal.instance.write('\b \b');
-                        currentInput = currentInput.substring(0, currentInput.length - 1);
+                    if (cursorPosition > 0) {
+                        deleteAtCursor(1);
+                        redrawLine();
                     }
                     break;
                     
-                case 9: // Tab
-                    domEvent.preventDefault();
-                    this.handleTabCompletion(terminalId, currentInput);
+                case 46: // Delete
+                    if (cursorPosition < currentInput.length) {
+                        const before = currentInput.slice(0, cursorPosition);
+                        const after = currentInput.slice(cursorPosition + 1);
+                        currentInput = before + after;
+                        redrawLine();
+                    }
+                    break;
+                    
+                case 37: // Left arrow
+                    if (cursorPosition > 0) {
+                        moveCursor(-1);
+                        terminal.instance.write('\x1b[D');
+                    }
+                    break;
+                    
+                case 39: // Right arrow
+                    if (cursorPosition < currentInput.length) {
+                        moveCursor(1);
+                        terminal.instance.write('\x1b[C');
+                    }
+                    break;
+                    
+                case 36: // Home
+                    cursorPosition = 0;
+                    redrawLine();
+                    break;
+                    
+                case 35: // End
+                    cursorPosition = currentInput.length;
+                    redrawLine();
                     break;
                     
                 case 38: // Up arrow
                     if (terminal.historyIndex > 0) {
                         terminal.historyIndex--;
-                        this.clearCurrentLine(terminalId);
                         currentInput = terminal.commandHistory[terminal.historyIndex];
-                        terminal.instance.write(currentInput);
+                        cursorPosition = currentInput.length;
+                        redrawLine();
                     }
                     break;
                     
                 case 40: // Down arrow
                     if (terminal.historyIndex < terminal.commandHistory.length - 1) {
                         terminal.historyIndex++;
-                        this.clearCurrentLine(terminalId);
                         currentInput = terminal.commandHistory[terminal.historyIndex];
-                        terminal.instance.write(currentInput);
-                    } else if (terminal.historyIndex === terminal.commandHistory.length - 1) {
+                        cursorPosition = currentInput.length;
+                        redrawLine();
+                    } else {
                         terminal.historyIndex = terminal.commandHistory.length;
-                        this.clearCurrentLine(terminalId);
                         currentInput = '';
+                        cursorPosition = 0;
+                        redrawLine();
                     }
                     break;
                     
@@ -8116,6 +8452,7 @@ const TerminalManager = {
                         terminal.instance.write('^C\r\n');
                         this.writePrompt(terminalId);
                         currentInput = '';
+                        cursorPosition = 0;
                     }
                     break;
                     
@@ -8124,54 +8461,65 @@ const TerminalManager = {
                         terminal.instance.clear();
                         this.writeWelcome(terminalId);
                         currentInput = '';
+                        cursorPosition = 0;
                     }
                     break;
                     
                 case 85: // Ctrl+U
                     if (domEvent.ctrlKey) {
-                        this.clearCurrentLine(terminalId);
-                        currentInput = '';
+                        currentInput = currentInput.slice(cursorPosition);
+                        cursorPosition = 0;
+                        redrawLine();
                     }
                     break;
                     
-                case 65: // Ctrl+A
+                case 75: // Ctrl+K
                     if (domEvent.ctrlKey) {
-                        // Move cursor to beginning of line
-                        terminal.instance.write('\x1b[1G');
-                        terminal.instance.write(`\x1b[1;32muser@procode\x1b[0m:\x1b[1;34m${terminal.currentDir === '/' ? '/' : terminal.currentDir.substring(1)}\x1b[0m$ `);
+                        currentInput = currentInput.slice(0, cursorPosition);
+                        redrawLine();
                     }
                     break;
                     
-                case 69: // Ctrl+E
+                case 87: // Ctrl+W (delete word)
                     if (domEvent.ctrlKey) {
-                        // Move cursor to end of line
-                        const promptLength = `user@procode:${terminal.currentDir === '/' ? '/' : terminal.currentDir.substring(1)}$ `.length;
-                        terminal.instance.write(`\x1b[${promptLength + currentInput.length + 1}G`);
+                        const before = currentInput.slice(0, cursorPosition);
+                        const lastSpace = before.trimRight().lastIndexOf(' ');
+                        const deleteCount = cursorPosition - (lastSpace + 1);
+                        if (deleteCount > 0) {
+                            deleteAtCursor(deleteCount);
+                            redrawLine();
+                        }
                     }
                     break;
                     
                 default:
                     if (printable) {
+                        insertAtCursor(key);
                         terminal.instance.write(key);
-                        currentInput += key;
+                        
+                        // ✅ FIX: Redraw if cursor not at end
+                        if (cursorPosition < currentInput.length) {
+                            redrawLine();
+                        }
                     }
             }
         });
         
-        // Handle paste
+        // ✅ FIX: Better paste handling
         terminal.instance.attachCustomKeyEventHandler((event) => {
             if ((event.ctrlKey || event.metaKey) && event.key === 'v') {
                 navigator.clipboard.readText().then(text => {
-                    terminal.instance.write(text);
-                    currentInput += text;
+                    // ✅ Sanitize pasted text
+                    const sanitized = text.replace(/[\r\n]+/g, ' ').trim();
+                    insertAtCursor(sanitized);
+                    redrawLine();
+                }).catch(err => {
+                    console.error('Paste failed:', err);
                 });
                 return false;
             }
             return true;
         });
-        
-        terminal.currentInput = currentInput;
-        terminal.isProcessing = isProcessing;
     },
     
     clearCurrentLine: function(terminalId) {
@@ -11640,6 +11988,125 @@ const Notifications = {
     }
 };
 
+// THÊM VÀO cuối file, trước window.addEventListener('load')
+class MemoryManager {
+    constructor() {
+        this.cleanupTasks = [];
+        this.memoryWarningThreshold = 0.85; // 85% memory usage
+        this.checkInterval = 30000; // 30s
+        
+        this.startMonitoring();
+    }
+    
+    startMonitoring() {
+        // ✅ Monitor memory usage if available
+        if (performance.memory) {
+            setInterval(() => this.checkMemory(), this.checkInterval);
+        }
+        
+        // ✅ Setup page visibility change handler
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                this.performMaintenance();
+            }
+        });
+    }
+    
+    checkMemory() {
+        if (!performance.memory) return;
+        
+        const { usedJSHeapSize, jsHeapSizeLimit } = performance.memory;
+        const usage = usedJSHeapSize / jsHeapSizeLimit;
+        
+        if (usage > this.memoryWarningThreshold) {
+            console.warn(`⚠️ High memory usage: ${(usage * 100).toFixed(1)}%`);
+            this.performMaintenance();
+        }
+    }
+    
+    performMaintenance() {
+        console.log('🧹 Performing memory maintenance...');
+        
+        // ✅ Clear editor cache
+        if (EditorManager.instances) {
+            Object.values(EditorManager.instances).forEach(editor => {
+                if (editor && editor.getModel()) {
+                    const model = editor.getModel();
+                    // Clear undo/redo history if too large
+                    if (model.getAlternativeVersionId() > 100) {
+                        // model.pushEditOperations([], [], () => null);
+                    }
+                }
+            });
+        }
+        
+        // ✅ Clear file cache
+        if (FileSystem.fileCache) {
+            const cacheSize = Object.keys(FileSystem.fileCache).length;
+            if (cacheSize > 50) {
+                FileSystem.fileCache = {};
+                console.log(`Cleared ${cacheSize} cached files`);
+            }
+        }
+        
+        // ✅ Clear terminal history
+        if (TerminalManager.terminals) {
+            Object.values(TerminalManager.terminals).forEach(term => {
+                if (term.commandHistory && term.commandHistory.length > 100) {
+                    term.commandHistory = term.commandHistory.slice(-50);
+                }
+            });
+        }
+        
+        // ✅ Clear console
+        if (Console.getHost()) {
+            const host = Console.getHost();
+            const children = host.children;
+            if (children.length > Console.maxEntries) {
+                while (children.length > Console.maxEntries / 2) {
+                    host.removeChild(children[0]);
+                }
+            }
+        }
+        
+        // ✅ Flush IndexedDB
+        if (IndexedDBManager.batcher) {
+            IndexedDBManager.batcher.flush();
+        }
+        
+        // ✅ Clear expired cache
+        IndexedDBManager.clearExpiredCache();
+        
+        // ✅ Run custom cleanup tasks
+        this.cleanupTasks.forEach(task => {
+            try {
+                task();
+            } catch (error) {
+                console.error('Cleanup task failed:', error);
+            }
+        });
+        
+        console.log('✅ Maintenance complete');
+    }
+    
+    registerCleanupTask(task) {
+        this.cleanupTasks.push(task);
+    }
+    
+    dispose() {
+        this.cleanupTasks = [];
+    }
+}
+
+// Initialize
+window.memoryManager = new MemoryManager();
+
+// Register cleanup for page unload
+window.addEventListener('beforeunload', () => {
+    window.memoryManager.performMaintenance();
+    window.memoryManager.dispose();
+});
+
 // ============================================
 // INITIALIZATION AND STARTUP
 // ============================================
@@ -11714,6 +12181,200 @@ window.addEventListener('load', async function() {
         }, 1000);
     }
 });
+
+// THÊM ngay sau window.addEventListener('load'...)
+class GlobalErrorHandler {
+    constructor() {
+        this.errors = [];
+        this.maxErrors = 50;
+        this.setupHandlers();
+    }
+    
+    setupHandlers() {
+        // ✅ Global error handler
+        window.addEventListener('error', (event) => {
+            this.handleError({
+                type: 'error',
+                message: event.message,
+                filename: event.filename,
+                lineno: event.lineno,
+                colno: event.colno,
+                error: event.error,
+                timestamp: new Date().toISOString()
+            });
+            
+            // Prevent default only for non-critical errors
+            if (!this.isCriticalError(event.error)) {
+                event.preventDefault();
+            }
+        });
+        
+        // ✅ Unhandled promise rejection
+        window.addEventListener('unhandledrejection', (event) => {
+            this.handleError({
+                type: 'unhandledRejection',
+                message: event.reason?.message || String(event.reason),
+                error: event.reason,
+                timestamp: new Date().toISOString()
+            });
+            
+            event.preventDefault();
+        });
+        
+        // ✅ Console error override
+        const originalError = console.error;
+        console.error = (...args) => {
+            originalError.apply(console, args);
+            this.handleError({
+                type: 'console',
+                message: args.map(a => String(a)).join(' '),
+                timestamp: new Date().toISOString()
+            });
+        };
+    }
+    
+    handleError(error) {
+        this.errors.push(error);
+        
+        // Keep only recent errors
+        if (this.errors.length > this.maxErrors) {
+            this.errors.shift();
+        }
+        
+        console.error('🔴 Error caught:', error);
+        
+        // Show user-friendly message for critical errors
+        if (this.isCriticalError(error.error)) {
+            this.showCriticalError(error);
+        }
+        
+        // Log to backend if configured
+        this.logError(error);
+    }
+    
+    isCriticalError(error) {
+        if (!error) return false;
+        
+        const criticalMessages = [
+            'out of memory',
+            'script error',
+            'network error',
+            'quota exceeded'
+        ];
+        
+        const message = (error.message || '').toLowerCase();
+        return criticalMessages.some(msg => message.includes(msg));
+    }
+    
+    showCriticalError(error) {
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        overlay.style.zIndex = '99999';
+        overlay.innerHTML = `
+            <div class="modal" style="width:600px;">
+                <div class="modal-header" style="background:var(--error);">
+                    <h3 style="color:white;"><i class="fas fa-exclamation-triangle"></i> Critical Error</h3>
+                </div>
+                <div class="modal-body">
+                    <p style="margin-bottom:16px;">The IDE encountered a critical error:</p>
+                    <pre style="background:#1e1e1e; color:#fff; padding:12px; border-radius:8px; overflow:auto; max-height:200px;">${Utils.escapeHtml(error.message)}</pre>
+                    <p style="margin-top:16px; color:var(--text-dim); font-size:12px;">
+                        Your work has been auto-saved. You may need to reload the page.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn" onclick="this.closest('.modal-overlay').remove()">Dismiss</button>
+                    <button class="btn primary" onclick="location.reload()">
+                        <i class="fas fa-redo"></i> Reload IDE
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(overlay);
+        
+        // Auto-save before showing error
+        if (FileSystem.autoSave) {
+            FileSystem.autoSave.forceFlush();
+        }
+    }
+    
+    logError(error) {
+        // Could send to analytics/logging service
+        // For now, just store locally
+        try {
+            const errorLog = JSON.parse(localStorage.getItem('procode_error_log') || '[]');
+            errorLog.push(error);
+            
+            // Keep only last 100 errors
+            if (errorLog.length > 100) {
+                errorLog.splice(0, errorLog.length - 100);
+            }
+            
+            localStorage.setItem('procode_error_log', JSON.stringify(errorLog));
+        } catch (e) {
+            // Ignore storage errors
+        }
+    }
+    
+    getRecentErrors() {
+        return this.errors.slice(-10);
+    }
+    
+    clearErrors() {
+        this.errors = [];
+        localStorage.removeItem('procode_error_log');
+    }
+}
+
+// Initialize
+window.errorHandler = new GlobalErrorHandler();
+
+// Add error viewer command to Command Palette
+// (thêm vào CommandPalette.refreshCommands)
+{
+    id: 'view-errors',
+    text: 'View Recent Errors',
+    icon: 'fa-bug',
+    action: () => {
+        const errors = window.errorHandler.getRecentErrors();
+        if (errors.length === 0) {
+            Utils.toast('No recent errors', 'info');
+            return;
+        }
+        
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `
+            <div class="modal" style="width:800px;">
+                <div class="modal-header">
+                    <h3><i class="fas fa-bug"></i> Recent Errors (${errors.length})</h3>
+                    <button class="btn icon small" onclick="this.closest('.modal-overlay').remove()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body" style="max-height:500px; overflow-y:auto;">
+                    ${errors.map(err => `
+                        <div style="margin-bottom:16px; padding:12px; background:var(--bg-side); border-radius:8px;">
+                            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                                <span style="font-weight:600; color:var(--error);">${err.type}</span>
+                                <span style="font-size:11px; color:var(--text-dim);">${Utils.formatDate(err.timestamp, 'relative')}</span>
+                            </div>
+                            <pre style="font-size:11px; overflow-x:auto;">${Utils.escapeHtml(err.message)}</pre>
+                        </div>
+                    `).join('')}
+                </div>
+                <div class="modal-footer">
+                    <button class="btn" onclick="this.closest('.modal-overlay').remove()">Close</button>
+                    <button class="btn danger" onclick="window.errorHandler.clearErrors(); this.closest('.modal-overlay').remove(); Utils.toast('Errors cleared', 'info');">
+                        <i class="fas fa-trash"></i> Clear All
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+}
 
 function setupEventListeners() {
     // Command palette input
