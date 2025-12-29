@@ -16,7 +16,7 @@
     
     <!-- COMPILERS & RUNTIMES -->
     <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
-    <script src="https://unpkg.com/typescript@5.4.5/lib/typescript.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/typescript/5.4.5/typescript.min.js"></script>
     <script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"></script>
     
     <!-- FORMATTERS -->
@@ -40,7 +40,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
 
     <!-- CHART.JS -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 
     <!-- LOTTIE ANIMATIONS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
@@ -3717,6 +3717,42 @@ const FileSystem = {
         }
     },
 
+    // Thêm vào FileSystem object
+    _writeQueue: new Map(),
+    _writeTimer: null,
+
+    writeDebounced: function(path, content, delay = 100) {
+        // Queue write operation
+        this._writeQueue.set(path, content);
+        
+        // Clear existing timer
+        if (this._writeTimer) {
+            clearTimeout(this._writeTimer);
+        }
+        
+        // Set new timer
+        this._writeTimer = setTimeout(() => {
+            this.flushWriteQueue();
+        }, delay);
+    },
+
+    flushWriteQueue: function() {
+        if (this._writeQueue.size === 0) return;
+        
+        const batch = Array.from(this._writeQueue.entries());
+        this._writeQueue.clear();
+        
+        // Batch write
+        batch.forEach(([path, content]) => {
+            this.write(path, content, { skipAutoSave: true });
+        });
+        
+        // Single save after batch
+        if (IDE.state.settings.editor.autoSave) {
+            this.save();
+        }
+    },
+
     // Queue delete for IndexedDB persistence (non-blocking)
     _queueIndexedDBDelete: function(path) {
         try {
@@ -3734,34 +3770,76 @@ const FileSystem = {
         }
     },
 
-    // Flush pending changes to IndexedDB
+    // Thay thế trong FileSystem object
     flushIndexedDB: async function() {
-        try {
-            if (!window.indexedDB) return;
-            await IndexedDBManager.init();
-
-            const writes = this._pendingDBWrites ? Array.from(this._pendingDBWrites.entries()) : [];
-            const deletes = this._pendingDBDeletes ? Array.from(this._pendingDBDeletes.values()) : [];
-            this._pendingDBWrites = new Map();
-            this._pendingDBDeletes = new Set();
-
-            const tasks = [];
-            for (const [p, c] of writes) {
-                tasks.push(IndexedDBManager.setFile(p, c));
-            }
-            for (const p of deletes) {
-                tasks.push(IndexedDBManager.deleteFile(p));
-            }
-
-            // Persist settings + last save (best-effort)
-            tasks.push(IndexedDBManager.setSetting('ide_settings', IDE.state.settings));
-            tasks.push(IndexedDBManager.setSetting('last_save', new Date().toISOString()));
-            tasks.push(IndexedDBManager.setSetting('ide_version', IDE.version));
-
-            await Promise.all(tasks);
-        } catch (e) {
-            console.warn('⚠️ IndexedDB flush failed:', e);
+        if (this._isFlushingDB) {
+            // Đợi flush hiện tại hoàn thành
+            return this._flushPromise;
         }
+        
+        this._isFlushingDB = true;
+        this._flushPromise = (async () => {
+            try {
+                if (!window.indexedDB) return;
+                await IndexedDBManager.init();
+
+                const writes = this._pendingDBWrites ? Array.from(this._pendingDBWrites.entries()) : [];
+                const deletes = this._pendingDBDeletes ? Array.from(this._pendingDBDeletes.values()) : [];
+                
+                // Clear queues immediately để tránh duplicate
+                this._pendingDBWrites = new Map();
+                this._pendingDBDeletes = new Set();
+
+                // Batch operations với transaction
+                const db = IndexedDBManager.db;
+                if (!db) return;
+                
+                const transaction = db.transaction(['files', 'settings'], 'readwrite');
+                const fileStore = transaction.objectStore('files');
+                const settingsStore = transaction.objectStore('settings');
+                
+                // Batch writes
+                for (const [path, content] of writes) {
+                    fileStore.put({
+                        path: path,
+                        content: content,
+                        size: new Blob([content]).size,
+                        modified: new Date().toISOString()
+                    });
+                }
+                
+                // Batch deletes
+                for (const path of deletes) {
+                    fileStore.delete(path);
+                }
+                
+                // Settings
+                settingsStore.put({ key: 'ide_settings', value: IDE.state.settings });
+                settingsStore.put({ key: 'last_save', value: new Date().toISOString() });
+                settingsStore.put({ key: 'ide_version', value: IDE.version });
+                
+                // Wait for transaction
+                await new Promise((resolve, reject) => {
+                    transaction.oncomplete = resolve;
+                    transaction.onerror = () => reject(transaction.error);
+                });
+                
+            } catch (e) {
+                console.warn('⚠️ IndexedDB flush failed:', e);
+                // Retry logic
+                if (!this._flushRetries) this._flushRetries = 0;
+                if (this._flushRetries < 3) {
+                    this._flushRetries++;
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    return this.flushIndexedDB();
+                }
+            } finally {
+                this._isFlushingDB = false;
+                this._flushRetries = 0;
+            }
+        })();
+        
+        return this._flushPromise;
     },
 
     // Validate file system structure
@@ -4099,70 +4177,122 @@ refreshTree: function() {
         this.renderFileTree(tree);
     }
 },
-    // Thêm vào FileSystem object:
-
-    renderFileTreeVirtual: function(container) {
-        const allFiles = this.buildFileStructure();
-        const flattenedItems = this.flattenFileStructure(allFiles);
+// Thêm vào FileSystem object
+renderFileTreeVirtual: function(container) {
+    const allFiles = this.buildFileStructure();
+    const flattenedItems = this.flattenFileStructure(allFiles);
+    
+    // Virtual scrolling configuration - OPTIMIZED
+    const itemHeight = 28;
+    const containerHeight = container.clientHeight;
+    const visibleCount = Math.ceil(containerHeight / itemHeight);
+    const bufferSize = 10; // Tăng buffer để scroll mượt hơn
+    
+    let scrollTop = 0;
+    let startIndex = 0;
+    let endIndex = visibleCount + bufferSize;
+    
+    // Create containers
+    const scrollContainer = document.createElement('div');
+    scrollContainer.style.height = `${flattenedItems.length * itemHeight}px`;
+    scrollContainer.style.position = 'relative';
+    
+    const visibleContainer = document.createElement('div');
+    visibleContainer.style.position = 'absolute';
+    visibleContainer.style.top = '0';
+    visibleContainer.style.left = '0';
+    visibleContainer.style.right = '0';
+    visibleContainer.style.willChange = 'transform'; // GPU acceleration
+    
+    // Render cache để tránh re-render không cần thiết
+    let renderCache = new Map();
+    let lastStartIndex = -1;
+    let animationFrameId = null;
+    
+    const renderVisibleItems = () => {
+        if (startIndex === lastStartIndex && renderCache.size > 0) {
+            return; // Không cần render lại
+        }
         
-        // Virtual scrolling configuration
-        const itemHeight = 28; // Height of each item in pixels
-        const containerHeight = container.clientHeight;
-        const visibleCount = Math.ceil(containerHeight / itemHeight);
-        const bufferSize = 5; // Extra items to render for smooth scrolling
+        const fragment = document.createDocumentFragment();
+        const itemsToRender = [];
         
-        let scrollTop = 0;
-        let startIndex = 0;
-        let endIndex = visibleCount + bufferSize;
-        
-        // Create scroll container
-        const scrollContainer = document.createElement('div');
-        scrollContainer.style.height = `${flattenedItems.length * itemHeight}px`;
-        scrollContainer.style.position = 'relative';
-        
-        // Create visible items container
-        const visibleContainer = document.createElement('div');
-        visibleContainer.style.position = 'absolute';
-        visibleContainer.style.top = '0';
-        visibleContainer.style.left = '0';
-        visibleContainer.style.right = '0';
-        
-        const renderVisibleItems = () => {
-            const fragment = document.createDocumentFragment();
+        for (let i = startIndex; i < Math.min(endIndex, flattenedItems.length); i++) {
+            const item = flattenedItems[i];
+            const cacheKey = `${item.path}-${i}`;
             
-            for (let i = startIndex; i < Math.min(endIndex, flattenedItems.length); i++) {
-                const item = flattenedItems[i];
-                const element = this.createFileTreeItem(item, i * itemHeight);
-                fragment.appendChild(element);
+            let element = renderCache.get(cacheKey);
+            if (!element) {
+                element = this.createFileTreeItem(item, i * itemHeight);
+                renderCache.set(cacheKey, element);
+            } else {
+                element.style.top = `${i * itemHeight}px`;
             }
             
-            visibleContainer.innerHTML = '';
-            visibleContainer.appendChild(fragment);
-        };
+            itemsToRender.push(element);
+        }
         
-        // Scroll handler with debouncing
-        const handleScroll = Utils.debounce(() => {
-            scrollTop = container.scrollTop;
-            startIndex = Math.max(0, Math.floor(scrollTop / itemHeight) - bufferSize);
-            endIndex = Math.min(flattenedItems.length, startIndex + visibleCount + (bufferSize * 2));
+        // Clear và append
+        visibleContainer.innerHTML = '';
+        itemsToRender.forEach(el => fragment.appendChild(el.cloneNode(true)));
+        visibleContainer.appendChild(fragment);
+        
+        lastStartIndex = startIndex;
+        
+        // Cleanup cache (giữ chỉ visible items + buffer)
+        if (renderCache.size > (visibleCount + bufferSize * 2) * 2) {
+            const keysToKeep = new Set();
+            for (let i = Math.max(0, startIndex - bufferSize); 
+                 i < Math.min(flattenedItems.length, endIndex + bufferSize); i++) {
+                keysToKeep.add(`${flattenedItems[i].path}-${i}`);
+            }
             
-            visibleContainer.style.transform = `translateY(${startIndex * itemHeight}px)`;
-            renderVisibleItems();
-        }, 16); // ~60fps
+            for (const key of renderCache.keys()) {
+                if (!keysToKeep.has(key)) {
+                    renderCache.delete(key);
+                }
+            }
+        }
+    };
+    
+    // Optimized scroll handler với RAF
+    const handleScroll = () => {
+        if (animationFrameId) {
+            cancelAnimationFrame(animationFrameId);
+        }
         
-        container.addEventListener('scroll', handleScroll);
-        
-        scrollContainer.appendChild(visibleContainer);
-        container.appendChild(scrollContainer);
-        
-        // Initial render
-        renderVisibleItems();
-        
-        // Store cleanup function
-        container._cleanupVirtualScroll = () => {
-            container.removeEventListener('scroll', handleScroll);
-        };
-    },
+        animationFrameId = requestAnimationFrame(() => {
+            scrollTop = container.scrollTop;
+            const newStartIndex = Math.max(0, Math.floor(scrollTop / itemHeight) - bufferSize);
+            const newEndIndex = Math.min(flattenedItems.length, newStartIndex + visibleCount + (bufferSize * 2));
+            
+            if (newStartIndex !== startIndex || newEndIndex !== endIndex) {
+                startIndex = newStartIndex;
+                endIndex = newEndIndex;
+                visibleContainer.style.transform = `translateY(${startIndex * itemHeight}px)`;
+                renderVisibleItems();
+            }
+        });
+    };
+    
+    // Passive listener cho performance
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    
+    scrollContainer.appendChild(visibleContainer);
+    container.appendChild(scrollContainer);
+    
+    // Initial render
+    renderVisibleItems();
+    
+    // Cleanup function
+    container._cleanupVirtualScroll = () => {
+        container.removeEventListener('scroll', handleScroll);
+        if (animationFrameId) {
+            cancelAnimationFrame(animationFrameId);
+        }
+        renderCache.clear();
+    };
+},
 
     flattenFileStructure: function(structure, level = 0, parentPath = '') {
         const items = [];
@@ -5840,111 +5970,13 @@ const EditorManager = {
         console.log('✅ Editor engine ready');
     },
 
-    // Trong FileSystem object, thay thế:
-    // (đoạn dưới là legacy snippet được paste nhầm - giữ lại để tham khảo, không còn dùng)
-    initFileSystemLegacy: async function() {
-    console.log('🚀 Initializing Enhanced File System v15.0 with IndexedDB');
-    
-    try {
-        // Initialize IndexedDB
-        await IndexedDBManager.init();
-        
-        // Load files from IndexedDB
-        const files = await IndexedDBManager.getAllFiles();
-        
-        if (files && files.length > 0) {
-            IDE.state.files = {};
-            files.forEach(file => {
-                IDE.state.files[file.path] = file.content;
-            });
-            Utils.toast(`📂 Loaded ${files.length} files from storage`, 'success');
-        } else {
-            // === TRY LOAD FROM COMPRESSED BACKUP ===
-            console.log('📦 No IndexedDB data, trying compressed backup...');
-            const compressed = localStorage.getItem(`procode_fs_compressed_v${IDE.version}`);
-            
-            if (compressed) {
-                try {
-                    const decompressed = LZString.decompressFromUTF16(compressed);
-                    const parsed = JSON.parse(decompressed);
-                    IDE.state.files = this.validateFileSystem(parsed);
-                    
-                    // Get compression stats
-                    const stats = JSON.parse(localStorage.getItem('procode_compression_stats') || '{}');
-                    if (stats.ratio) {
-                        console.log(`✅ Loaded from compressed backup (saved ${stats.ratio}% space)`);
-                    }
-                    
-                    // Migrate to IndexedDB
-                    console.log('🔄 Migrating to IndexedDB...');
-                    for (const [path, content] of Object.entries(IDE.state.files)) {
-                        await IndexedDBManager.setFile(path, content);
-                    }
-                    console.log('✅ Migration complete');
-                    
-                    Utils.toast('📦 Loaded from compressed backup', 'info');
-                } catch (e) {
-                    console.error('❌ Decompression failed:', e);
-                    throw e;
-                }
-            } else {
-                // Load default template
-                IDE.state.files = { ...IDE.state.templates.vanilla };
-                // Save to IndexedDB
-                for (const [path, content] of Object.entries(IDE.state.files)) {
-                    await IndexedDBManager.setFile(path, content);
-                }
-                Utils.toast('🎉 Welcome to ProCode IDE v15.0!', 'info');
-            }
-        }
-        
-        // Load settings
-        const settings = await IndexedDBManager.getSetting('ide_settings');
-        if (settings) {
-            IDE.state.settings = Utils.deepMerge(IDE.state.settings, settings);
-        }
-        
-        // Save current version
-        await IndexedDBManager.setSetting('ide_version', IDE.version);
-        
-        this.refreshTree();
-        this.setupAutoSave();
-        this.setupFileWatchers();
-        this.updateFileSystemMetrics();
-        
-        console.log('✅ File system initialized');
-        
-    } catch (error) {
-        console.error('❌ Failed to initialize:', error);
-        
-        // Fallback to uncompressed localStorage
-        console.log('📦 Falling back to uncompressed localStorage...');
-        const saved = localStorage.getItem(`procode_fs_v${IDE.version}`);
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved);
-                IDE.state.files = this.validateFileSystem(parsed);
-                Utils.toast('⚠️ Loaded from fallback storage', 'warning');
-            } catch (e) {
-                IDE.state.files = { ...IDE.state.templates.vanilla };
-                Utils.toast('Created new project', 'info');
-            }
-        } else {
-            IDE.state.files = { ...IDE.state.templates.vanilla };
-        }
-        
-        this.refreshTree();
-        this.setupAutoSave();
-        this.updateFileSystemMetrics();
-    }
-},
-
 // Thêm SAU FileSystem.init()
 
 // ============================================
 // WEB WORKER FOR HEAVY PROCESSING
 // ============================================
-initWebWorker: function() {
+// Initialize Web Worker for background tasks
+    initWebWorker: function() {
     if (this.worker) {
         console.log('⚠️ Worker already initialized');
         return;
@@ -5952,13 +5984,24 @@ initWebWorker: function() {
     
     console.log('🔧 Initializing Web Worker...');
     
-    // Create worker inline
     const workerCode = `
-        // Web Worker for heavy processing
+        // Web Worker with enhanced error handling
         console.log('👷 Worker thread started');
+        
+        let taskTimeout = null;
         
         self.addEventListener('message', function(e) {
             const { type, id, data } = e.data;
+            
+            // Clear any existing timeout
+            if (taskTimeout) {
+                clearTimeout(taskTimeout);
+            }
+            
+            // Set timeout for task (30 seconds)
+            taskTimeout = setTimeout(() => {
+                postError(id, 'Task timeout after 30 seconds');
+            }, 30000);
             
             try {
                 switch(type) {
@@ -5978,7 +6021,12 @@ initWebWorker: function() {
                         postError(id, 'Unknown task type: ' + type);
                 }
             } catch (error) {
-                postError(id, error.message);
+                postError(id, error.message + '\\n' + error.stack);
+            } finally {
+                if (taskTimeout) {
+                    clearTimeout(taskTimeout);
+                    taskTimeout = null;
+                }
             }
         });
         
@@ -5994,195 +6042,18 @@ initWebWorker: function() {
             self.postMessage({ id, status: 'progress', progress });
         }
         
-        // === SEARCH IN FILES ===
-        function searchInFiles(id, { query, files, options }) {
-            const startTime = performance.now();
-            const results = [];
-            const fileCount = Object.keys(files).length;
-            let processed = 0;
-            
-            const regex = new RegExp(
-                options.regex ? query : (options.wholeWord ? '\\\\b' + query + '\\\\b' : query),
-                options.caseSensitive ? 'g' : 'gi'
-            );
-            
-            for (const [path, content] of Object.entries(files)) {
-                // Skip if file type filter is set
-                if (options.fileTypes && options.fileTypes.length > 0) {
-                    const ext = path.split('.').pop().toLowerCase();
-                    if (!options.fileTypes.includes(ext)) {
-                        processed++;
-                        continue;
-                    }
-                }
-                
-                const lines = content.split('\\n');
-                
-                lines.forEach((line, index) => {
-                    const matches = line.match(regex);
-                    if (matches) {
-                        results.push({
-                            path: path,
-                            line: index + 1,
-                            content: line.trim(),
-                            matches: matches.length,
-                            column: line.indexOf(matches[0]) + 1
-                        });
-                    }
-                });
-                
-                processed++;
-                
-                // Report progress every 10 files
-                if (processed % 10 === 0) {
-                    postProgress(id, Math.round((processed / fileCount) * 100));
-                }
-            }
-            
-            const duration = performance.now() - startTime;
-            
-            postResult(id, 'search-complete', {
-                results: results,
-                duration: duration,
-                totalFiles: fileCount,
-                matchCount: results.length
-            });
-        }
+        // [Giữ nguyên các function khác...]
         
-        // === PARSE CODE FOR OUTLINE ===
-        function parseCode(id, { code, language, path }) {
-            const startTime = performance.now();
-            const results = [];
-            
-            if (language === 'javascript' || language === 'typescript') {
-                // Functions
-                const functionRegex = /(?:async\\s+)?(?:function\\s+(\\w+)|(?:const|let|var)\\s+(\\w+)\\s*=\\s*(?:async\\s+)?\\([^)]*\\)\\s*=>)/g;
-                let match;
-                
-                while ((match = functionRegex.exec(code)) !== null) {
-                    const name = match[1] || match[2];
-                    const line = (code.substring(0, match.index).match(/\\n/g) || []).length + 1;
-                    results.push({
-                        type: 'function',
-                        name: name,
-                        line: line,
-                        icon: 'fas fa-function',
-                        color: '#61dafb'
-                    });
-                }
-                
-                // Classes
-                const classRegex = /class\\s+(\\w+)/g;
-                while ((match = classRegex.exec(code)) !== null) {
-                    const line = (code.substring(0, match.index).match(/\\n/g) || []).length + 1;
-                    results.push({
-                        type: 'class',
-                        name: match[1],
-                        line: line,
-                        icon: 'fas fa-cube',
-                        color: '#f59e0b'
-                    });
-                }
-                
-                // Imports
-                const importRegex = /^import\\s+(.+?)\\s+from/gm;
-                while ((match = importRegex.exec(code)) !== null) {
-                    const line = (code.substring(0, match.index).match(/\\n/g) || []).length + 1;
-                    results.push({
-                        type: 'import',
-                        name: match[1].trim(),
-                        line: line,
-                        icon: 'fas fa-download',
-                        color: '#10b981'
-                    });
-                }
-            }
-            
-            const duration = performance.now() - startTime;
-            
-            postResult(id, 'parse-complete', {
-                results: results,
-                duration: duration
-            });
-        }
+        // Error handler
+        self.addEventListener('error', function(e) {
+            console.error('Worker error:', e);
+            postError(-1, 'Worker error: ' + e.message);
+        });
         
-        // === FORMAT CODE ===
-        function formatCode(id, { code, language }) {
-            const startTime = performance.now();
-            let formatted = code;
-            
-            // Basic formatting
-            const lines = code.split('\\n');
-            let indentLevel = 0;
-            const indentSize = 2;
-            
-            formatted = lines.map(line => {
-                const trimmed = line.trim();
-                
-                if (trimmed.includes('}') && !trimmed.includes('{')) {
-                    indentLevel = Math.max(0, indentLevel - 1);
-                }
-                
-                const indented = ' '.repeat(indentLevel * indentSize) + trimmed;
-                
-                if (trimmed.includes('{') && !trimmed.includes('}')) {
-                    indentLevel++;
-                }
-                
-                return indented;
-            }).join('\\n');
-            
-            const duration = performance.now() - startTime;
-            
-            postResult(id, 'format-complete', {
-                code: formatted,
-                duration: duration
-            });
-        }
-        
-        // === ANALYZE CODE ===
-        function analyzeCode(id, { code, language }) {
-            const startTime = performance.now();
-            const analysis = {
-                lines: 0,
-                characters: 0,
-                functions: 0,
-                classes: 0,
-                comments: 0,
-                imports: 0,
-                complexity: 0
-            };
-            
-            analysis.lines = code.split('\\n').length;
-            analysis.characters = code.length;
-            
-            // Count functions
-            const functionRegex = /function\\s+\\w+|\\(.*\\)\\s*=>/g;
-            analysis.functions = (code.match(functionRegex) || []).length;
-            
-            // Count classes
-            const classRegex = /class\\s+\\w+/g;
-            analysis.classes = (code.match(classRegex) || []).length;
-            
-            // Count comments
-            const commentRegex = /\\/\\/.*|\\/\\*[\\s\\S]*?\\*\\//g;
-            analysis.comments = (code.match(commentRegex) || []).length;
-            
-            // Count imports
-            const importRegex = /^import\\s+/gm;
-            analysis.imports = (code.match(importRegex) || []).length;
-            
-            // Calculate cyclomatic complexity (simple version)
-            const complexityKeywords = /\\b(if|else|for|while|case|catch|&&|\\|\\|)\\b/g;
-            analysis.complexity = (code.match(complexityKeywords) || []).length + 1;
-            
-            const duration = performance.now() - startTime;
-            
-            postResult(id, 'analyze-complete', {
-                analysis: analysis,
-                duration: duration
-            });
-        }
+        self.addEventListener('unhandledrejection', function(e) {
+            console.error('Worker unhandled rejection:', e);
+            postError(-1, 'Unhandled rejection: ' + e.reason);
+        });
         
         console.log('✅ Worker ready');
     `;
@@ -6191,16 +6062,18 @@ initWebWorker: function() {
         const blob = new Blob([workerCode], { type: 'application/javascript' });
         this.worker = new Worker(URL.createObjectURL(blob));
         
-        // Track pending tasks
         this.workerTasks = new Map();
         this.workerTaskId = 0;
         
-        // Handle worker messages
+        // Enhanced message handler
         this.worker.addEventListener('message', (e) => {
             const { id, type, status, result, error, progress } = e.data;
             
             const task = this.workerTasks.get(id);
-            if (!task) return;
+            if (!task) {
+                console.warn('Received message for unknown task:', id);
+                return;
+            }
             
             if (status === 'success') {
                 task.resolve(result);
@@ -6213,14 +6086,24 @@ initWebWorker: function() {
             }
         });
         
-        // Handle worker errors
+        // Enhanced error handler
         this.worker.addEventListener('error', (e) => {
             console.error('❌ Worker error:', e);
+            
             // Reject all pending tasks
-            this.workerTasks.forEach(task => {
-                task.reject(new Error('Worker error: ' + e.message));
+            this.workerTasks.forEach((task, id) => {
+                task.reject(new Error('Worker crashed: ' + e.message));
             });
             this.workerTasks.clear();
+            
+            // Attempt to restart worker
+            this.worker.terminate();
+            this.worker = null;
+            
+            setTimeout(() => {
+                console.log('🔄 Attempting to restart worker...');
+                this.initWebWorker();
+            }, 1000);
         });
         
         console.log('✅ Web Worker initialized');
@@ -7684,7 +7567,53 @@ addCustomCommands: function(editor) {
         `;
         
         document.body.appendChild(dialog);
-    }
+    },
+    // Thêm vào EditorManager object
+    disposeEditor: function(editorId) {
+        const editor = this.instances[editorId];
+        if (!editor) return;
+        
+        try {
+            // Dispose model
+            const model = editor.getModel();
+            if (model) {
+                model.dispose();
+            }
+            
+            // Remove resize observer
+            if (editor.resizeObserver) {
+                editor.resizeObserver.disconnect();
+            }
+            
+            // Dispose editor
+            editor.dispose();
+            
+            // Clear diagnostics
+            this.diagnostics.delete(editorId);
+            this.codeLenses.delete(editorId);
+            
+            // Remove from instances
+            delete this.instances[editorId];
+            
+            console.log(`✅ Editor ${editorId} disposed`);
+        } catch (error) {
+            console.error('Failed to dispose editor:', error);
+        }
+    },
+
+    // Cleanup all editors on page unload
+    cleanup: function() {
+        Object.keys(this.instances).forEach(id => this.disposeEditor(id));
+        
+        // Dispose all models
+        monaco.editor.getModels().forEach(model => {
+            try {
+                model.dispose();
+            } catch (e) {
+                // Ignore
+            }
+        });
+    },
 };
 
 // ============================================
@@ -9229,49 +9158,80 @@ const Runner = {
         );
     },
 
+// Thay thế trong Runner object
 stripModuleSyntax: function(code) {
     const warnings = [];
     const lines = code.split(/\r?\n/);
     const kept = [];
     let inMultilineImport = false;
     let inMultilineExport = false;
+    let multilineBuffer = '';
+    let braceCount = 0;
 
     lines.forEach((line, index) => {
         const trimmed = line.trim();
         
         // Handle multiline imports
         if (inMultilineImport) {
-            if (trimmed.includes(';') || trimmed.includes('from')) {
+            multilineBuffer += ' ' + trimmed;
+            
+            // Count braces để detect end
+            braceCount += (trimmed.match(/{/g) || []).length;
+            braceCount -= (trimmed.match(/}/g) || []).length;
+            
+            if (braceCount === 0 && (trimmed.includes(';') || trimmed.includes('from'))) {
                 inMultilineImport = false;
-                warnings.push(`Stripped multiline import ending at line ${index + 1}`);
+                warnings.push(`Stripped multiline import: ${multilineBuffer.substring(0, 60)}...`);
+                multilineBuffer = '';
             }
             return;
         }
         
         // Handle multiline exports
         if (inMultilineExport) {
-            if (trimmed.includes('}')) {
+            multilineBuffer += ' ' + trimmed;
+            braceCount += (trimmed.match(/{/g) || []).length;
+            braceCount -= (trimmed.match(/}/g) || []).length;
+            
+            if (braceCount === 0) {
                 inMultilineExport = false;
-                warnings.push(`Stripped multiline export ending at line ${index + 1}`);
+                warnings.push(`Stripped multiline export: ${multilineBuffer.substring(0, 60)}...`);
+                multilineBuffer = '';
             }
             return;
         }
         
-        // Single line imports
-        if (/^import\s/.test(trimmed)) {
-            if (!trimmed.includes(';') && !trimmed.includes('from')) {
+        // Import statements - IMPROVED DETECTION
+        if (/^\s*import\s/.test(trimmed)) {
+            // Check if complete statement
+            if (!trimmed.includes(';') && !trimmed.includes('from') && trimmed.includes('{')) {
                 inMultilineImport = true;
+                multilineBuffer = trimmed;
+                braceCount = (trimmed.match(/{/g) || []).length - (trimmed.match(/}/g) || []).length;
+            } else {
+                warnings.push(`Stripped import: ${trimmed.substring(0, 60)}${trimmed.length > 60 ? '...' : ''}`);
             }
-            warnings.push(`Stripped import: ${trimmed.substring(0, 60)}${trimmed.length > 60 ? '...' : ''}`);
             return;
         }
         
-        // Export default
-        if (/^export\s+default\s+/.test(trimmed)) {
-            const match = trimmed.match(/^export\s+default\s+(class|function)\s+(\w+)/);
+        // Dynamic imports - KEEP THEM (they can work in browser)
+        if (/import\s*\(/.test(trimmed)) {
+            warnings.push(`Dynamic import detected (kept): ${trimmed.substring(0, 60)}...`);
+            kept.push(line);
+            return;
+        }
+        
+        // Export default - IMPROVED
+        if (/^\s*export\s+default\s+/.test(trimmed)) {
+            const match = trimmed.match(/^\s*export\s+default\s+(class|function|const|let|var)\s+(\w+)/);
             if (match) {
                 warnings.push(`Converted export default ${match[1]}: ${match[2]}`);
                 kept.push(line.replace(/^\s*export\s+default\s+/, ''));
+            } else if (/^\s*export\s+default\s+{/.test(trimmed)) {
+                // Export default object
+                warnings.push(`Stripped export default object`);
+                const replaced = line.replace(/^\s*export\s+default\s+/, 'const __default_export__ = ');
+                kept.push(replaced);
             } else {
                 warnings.push(`Stripped export default: ${trimmed}`);
                 kept.push(line.replace(/^\s*export\s+default\s+/, 'const __default_export__ = '));
@@ -9280,37 +9240,57 @@ stripModuleSyntax: function(code) {
         }
         
         // Export lists
-        if (/^export\s+{/.test(trimmed)) {
+        if (/^\s*export\s+{/.test(trimmed)) {
             if (!trimmed.includes('}')) {
                 inMultilineExport = true;
+                multilineBuffer = trimmed;
+                braceCount = 1;
+            } else {
+                warnings.push(`Stripped export list: ${trimmed}`);
             }
-            warnings.push(`Stripped export list: ${trimmed}`);
             return;
         }
         
-        // Export declarations
-        if (/^export\s+(const|let|var|function|class|async\s+function)\s+/.test(trimmed)) {
+        // Named exports
+        if (/^\s*export\s+(const|let|var|function|class|async\s+function)\s+/.test(trimmed)) {
             warnings.push(`Stripped export keyword from: ${trimmed.substring(0, 60)}`);
             kept.push(line.replace(/^\s*export\s+/, ''));
             return;
         }
         
-        // CommonJS require
-        if (/const\s+\w+\s*=\s*require\(/.test(trimmed) || /require\s*\(/.test(trimmed)) {
-            warnings.push(`Removed require() call: ${trimmed}`);
+        // Re-exports (export ... from ...)
+        if (/^\s*export\s+.*\s+from\s+/.test(trimmed)) {
+            warnings.push(`Stripped re-export: ${trimmed}`);
             return;
         }
         
-        // module.exports
-        if (/module\.exports\s*=/.test(trimmed) || /exports\.\w+\s*=/.test(trimmed)) {
-            warnings.push(`Removed module.exports: ${trimmed}`);
-            return;
+        // CommonJS - IMPROVED DETECTION
+        if (/\b(require\s*\(|module\.exports|exports\.)/.test(trimmed)) {
+            // Check if it's in a comment
+            if (/^\s*(\/\/|\/\*)/.test(trimmed)) {
+                kept.push(line);
+                return;
+            }
+            
+            if (/module\.exports\s*=/.test(trimmed) || /exports\.\w+\s*=/.test(trimmed)) {
+                warnings.push(`Removed module.exports: ${trimmed}`);
+                return;
+            }
+            
+            if (/\brequire\s*\(/.test(trimmed)) {
+                warnings.push(`Removed require() call: ${trimmed}`);
+                return;
+            }
         }
         
         kept.push(line);
     });
 
-    return { code: kept.join('\n'), warnings };
+    return { 
+        code: kept.join('\n'), 
+        warnings: warnings,
+        hasRemainingModuleSyntax: this.hasModuleSyntax(kept.join('\n'))
+    };
 },
 
     injectPreviewBridge: function(html) {
@@ -12136,6 +12116,127 @@ window.addEventListener('offline', () => {
     document.getElementById('status-indicator').className = 'status-dot offline';
     Utils.toast('Working offline', 'warning');
 });
+// Setup cleanup on page unload
+window.addEventListener('beforeunload', (e) => {
+    // Save everything
+    FileSystem.save(true);
+    
+    // Cleanup editors
+    EditorManager.cleanup();
+    
+    // Terminate worker
+    if (FileSystem.worker) {
+        FileSystem.terminateWorker();
+    }
+    
+    // Cleanup terminal
+    Object.values(TerminalManager.terminals).forEach(terminal => {
+        if (terminal.instance) {
+            terminal.instance.dispose();
+        }
+    });
+});
+// ============================================
+// AUTO-RECOVERY SYSTEM
+// ============================================
+const AutoRecovery = {
+    STORAGE_KEY: 'procode_recovery_',
+    INTERVAL: 30000, // 30 seconds
+    
+    init: function() {
+        // Start auto-save
+        this.startAutoSave();
+        
+        // Check for recovery on startup
+        this.checkRecovery();
+        
+        // Setup beforeunload
+        window.addEventListener('beforeunload', () => {
+            this.saveRecoveryPoint();
+        });
+    },
+    
+    startAutoSave: function() {
+        setInterval(() => {
+            if (IDE.state.dirtyTabs.size > 0) {
+                this.saveRecoveryPoint();
+            }
+        }, this.INTERVAL);
+    },
+    
+    saveRecoveryPoint: function() {
+        try {
+            const recoveryData = {
+                files: IDE.state.files,
+                tabs: IDE.state.tabs,
+                activeTab: IDE.state.activeTab,
+                timestamp: new Date().toISOString(),
+                version: IDE.version
+            };
+            
+            const compressed = LZString.compressToUTF16(JSON.stringify(recoveryData));
+            localStorage.setItem(this.STORAGE_KEY + 'latest', compressed);
+            
+            console.log('💾 Recovery point saved');
+        } catch (error) {
+            console.error('Failed to save recovery point:', error);
+        }
+    },
+    
+    checkRecovery: function() {
+        try {
+            const compressed = localStorage.getItem(this.STORAGE_KEY + 'latest');
+            if (!compressed) return;
+            
+            const recoveryData = JSON.parse(LZString.decompressFromUTF16(compressed));
+            const recoveryTime = new Date(recoveryData.timestamp);
+            const now = new Date();
+            const diff = now - recoveryTime;
+            
+            // If recovery data is less than 1 hour old, offer recovery
+            if (diff < 3600000) {
+                const message = `Found auto-saved work from ${Utils.formatDate(recoveryTime, 'relative')}. Restore?`;
+                if (confirm(message)) {
+                    this.restore(recoveryData);
+                } else {
+                    this.clearRecovery();
+                }
+            } else {
+                this.clearRecovery();
+            }
+        } catch (error) {
+            console.error('Failed to check recovery:', error);
+            this.clearRecovery();
+        }
+    },
+    
+    restore: function(recoveryData) {
+        try {
+            IDE.state.files = recoveryData.files;
+            IDE.state.tabs = recoveryData.tabs;
+            IDE.state.activeTab = recoveryData.activeTab;
+            
+            FileSystem.save(true);
+            FileSystem.refreshTree();
+            
+            if (recoveryData.activeTab) {
+                TabManager.open(recoveryData.activeTab);
+            }
+            
+            Utils.toast('✅ Work restored from auto-save', 'success');
+            this.clearRecovery();
+        } catch (error) {
+            Utils.toast('Failed to restore: ' + error.message, 'error');
+        }
+    },
+    
+    clearRecovery: function() {
+        localStorage.removeItem(this.STORAGE_KEY + 'latest');
+    }
+};
+
+// Initialize auto-recovery
+AutoRecovery.init();
 </script>
 </body>
 </html>
