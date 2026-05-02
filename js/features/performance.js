@@ -28,7 +28,6 @@ const PistonAPI = (function() {
   const DEFAULT_ENDPOINTS = [
     'https://piston-production-d148.up.railway.app/api/v2/execute',
     'https://piston-production-ccb3.up.railway.app/api/v2/piston/execute',
-    'https://emkc.org/api/v2/piston/execute',
   ];
   // CORS proxies used as auto-fallback when a direct request fails with
   // a CORS / network error (browser cannot read the response).  Each entry
