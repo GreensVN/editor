@@ -1,0 +1,2204 @@
+<!DOCTYPE html>
+<!-- ═══════════════════════════════════════════════════════════════════════
+     ProCode IDE v3.0 — REFACTORED (Multi-file Edition)
+     
+     Original: procode_v3_fixed.html (single-file, 57K lines)
+     Refactored into:
+       css/styles.css                 — consolidated CSS (44 sections)
+       js/core/debug.js               — debug gate
+       js/core/pwa-bootstrap.js       — PWA manifest & SW
+       js/core/security.js            — HTML sanitizer / XSS protection
+       js/core/api-key.js             — API key management
+       js/core/boot-orchestrator.js   — boot kill-switches & progress
+       js/core/timer-guard.js         — safe setTimeout/setInterval
+       js/core/syntax-check.js        — real-time syntax checker
+       js/core/amd-guard.js           — AMD/RequireJS conflict guard
+       js/core/monaco-bootstrap.js    — Monaco editor CDN loader
+       js/core/loader-guard.js        — guaranteed loader hide
+       js/modules/core-ide-state.js   — IDE config, FileSystem, IDB
+       js/modules/utils.js            — utilities (icons, detect, format)
+       js/modules/filesystem-extra.js — extra FS methods
+       js/modules/editor-manager.js   — Monaco lifecycle
+       js/modules/tab-manager.js      — tab bar
+       js/modules/terminal-manager.js — xterm terminal
+       js/modules/console-manager.js  — output console
+       js/modules/runner.js           — code execution engine
+       js/modules/debugger.js         — debugger
+       js/modules/panel-manager.js    — panel visibility
+       js/modules/ai-manager.js       — Claude AI integration
+       js/modules/project-templates.js— starter templates
+       js/modules/git-manager.js      — git integration
+       js/modules/search-manager.js   — find/replace
+       js/modules/layout-manager.js   — layout/drag
+       js/modules/settings-manager.js — preferences
+       js/modules/workspace-io.js     — import/export
+       js/modules/session-manager.js  — session save/restore
+       js/modules/command-palette.js  — command palette
+       js/modules/tutorial-manager.js — onboarding
+       js/modules/notifications.js    — notification system
+       js/modules/init-and-patches.js — init, inspector, auto-recovery
+       js/features/*.js               — UI upgrades, tools, fixes
+═══════════════════════════════════════════════════════════════════════ -->
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>ProCode IDE v3.0 — Claude AI Powered</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="theme-color" content="#0b0f14"/>
+  <meta name="color-scheme" content="dark light"/>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' blob: data:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://cdn.tailwindcss.com blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https:; connect-src 'self' https://api.anthropic.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://cdn.tailwindcss.com https://fonts.googleapis.com https://fonts.gstatic.com https://piston-production-d148.up.railway.app https://piston-production-ccb3.up.railway.app https://emkc.org https://piston.rdshrjn.dev https://piston.drfortune.lol https://piston.gaeduron.fr https://corsproxy.io https://api.allorigins.win https://cors.eu.org wss: blob: data:; worker-src 'self' blob:; frame-src 'self' blob:;">
+
+  <!-- PWA -->
+  <link rel="manifest" id="pwa-manifest" href="data:application/manifest+json,%7B%22name%22%3A%22ProCode%20IDE%22%7D"/>
+  <link rel="icon" id="pwa-favicon" href="" type="image/svg+xml"/>
+  <link rel="apple-touch-icon" id="pwa-apple-icon" href=""/>
+
+  <!-- External fonts & icons -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" crossorigin="anonymous"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css" crossorigin="anonymous"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js@1.12.0/src/toastify.min.css" crossorigin="anonymous"/>
+
+  <!-- Consolidated stylesheet -->
+  <link rel="stylesheet" href="css/styles.css"/>
+
+  <!-- ── CORE SCRIPTS (load order matters) ─────────────────────────── -->
+  <script src="js/core/debug.js"></script>
+  <script src="js/core/pwa-bootstrap.js"></script>
+  <script src="js/core/security.js"></script>
+  <script src="js/core/api-key.js"></script>
+  <script src="js/core/boot-orchestrator.js"></script>
+  <script src="js/core/timer-guard.js"></script>
+  <script src="js/core/syntax-check.js"></script>
+  <script src="js/core/amd-guard.js"></script>
+
+  <!-- ── CDN LIBRARIES ─────────────────────────────────────────────── -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.0/marked.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js" crossorigin="anonymous"></script>
+
+  <!-- AMD guard: hide define() before loading AMD libraries -->
+    <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js" crossorigin="anonymous"></script>
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/typescript/5.4.5/typescript.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js" crossorigin="anonymous" onerror="window.__pyodideFailed=true"></script>
+
+    <script src="https://unpkg.com/prettier@3.2.5/standalone.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/prettier@3.2.5/plugins/html.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/prettier@3.2.5/plugins/babel.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/prettier@3.2.5/plugins/postcss.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/prettier@3.2.5/plugins/typescript.js" crossorigin="anonymous"></script>
+  
+  <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/toastify-js@1.12.0/src/toastify.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-jsx.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-typescript.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js" crossorigin="anonymous"></script>
+
+  <!-- Monaco Editor loader -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.js" crossorigin="anonymous"></script>
+  <script>
+  // ╔═══════════════════════════════════════════════════════════╗
+  // ║  AMD CONFLICT PREVENTION — ProCode IDE v3 Fix             ║
+  // ║  Monaco's loader.js sets window.define (AMD-compliant).   ║
+  // ║  UMD libs (lightning-fs, fuse, fengari, sql.js) call     ║
+  // ║  anonymous define() which conflicts with Monaco's loader. ║
+  // ║  SOLUTION: Wrap define() — anonymous calls from static    ║
+  // ║  <script> tags are silently ignored; Monaco's own         ║
+  // ║  XHR-eval'd anonymous defines are still processed.        ║
+  // ╚═══════════════════════════════════════════════════════════╝
+  (function patchMonacoDefine() {
+    var _origDefine = window.define;
+    if (!_origDefine || !_origDefine.amd) return;
+    
+    function safeDefine(id, deps, factory) {
+      // Anonymous define call: check if it's from a static <script> tag
+      // or from Monaco's XHR-eval pipeline.
+      // document.currentScript is non-null for static <script> tags,
+      // but null/undefined inside eval() (Monaco's XHR pipeline).
+      if (typeof id !== 'string') {
+        if (document.currentScript) {
+          // Called from a static <script> tag — this is a UMD lib conflict.
+          // Silently drop it; the lib will use its global fallback.
+          return;
+        }
+        // Called from eval() context (Monaco's XHR pipeline) — allow it.
+      }
+      return _origDefine.apply(this, arguments);
+    }
+    safeDefine.amd = _origDefine.amd;
+    safeDefine.__original = _origDefine;
+    window.define = safeDefine;
+    window.__monacoDefineWrapped = true;
+  })();
+  </script>
+  <script src="js/core/monaco-bootstrap.js"></script>
+  <script src="js/core/loader-guard.js"></script>
+
+</head>
+<body>
+
+
+<div id="drag-overlay" aria-hidden="true">
+  <div class="dropbox" role="dialog" aria-label="Import files">
+    <h3>📦 Thả file / folder / ZIP vào đây để import</h3>
+    <p>
+      Hỗ trợ: <code>.zip</code>, file đơn lẻ, hoặc folder (Chrome/Edge). 
+      Tip: <code>Ctrl</code>+<code>Shift</code>+<code>S</code> để Export ZIP.
+    </p>
+  </div>
+</div>
+
+<!-- BOOT SCREEN ─ v36 upgraded splash ───────────────────────────────────── -->
+<div id="loader-overlay">
+  <!-- Ambient layers -->
+  <div class="boot-grid"></div>
+  <div class="boot-orb boot-orb-1"></div>
+  <div class="boot-orb boot-orb-2"></div>
+  <div class="boot-orb boot-orb-3"></div>
+  <div class="boot-noise"></div>
+
+  <!-- Center stack -->
+  <div class="boot-stack">
+    <!-- Logo with rotating concentric rings -->
+    <div class="boot-mark">
+      <div class="boot-ring boot-ring-1"></div>
+      <div class="boot-ring boot-ring-2"></div>
+      <div class="boot-ring boot-ring-3"></div>
+      <div class="boot-ring-arc"></div>
+      <div class="boot-logo-glyph"><i class="fas fa-code"></i></div>
+    </div>
+
+    <!-- Wordmark -->
+    <div class="boot-wordmark">
+      <span class="boot-word-pro">PRO</span><span class="boot-word-code">CODE</span>
+      <span class="boot-word-ide">IDE</span>
+    </div>
+    <div class="boot-tagline">v3.0 · Code at the speed of thought</div>
+
+    <!-- Progress -->
+    <div class="boot-progress-wrap">
+      <div id="boot-progress" class="boot-progress-track">
+        <div id="boot-progress-fill" class="boot-progress-fill"></div>
+        <div class="boot-progress-shimmer"></div>
+      </div>
+      <div class="boot-progress-meta">
+        <div id="boot-status" class="boot-status">Initializing ProCode IDE v3.0</div>
+        <div class="boot-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+      </div>
+    </div>
+
+    <!-- Hidden compatibility spinner (some legacy probes look for it) -->
+    <div class="spinner" aria-hidden="true" style="display:none;width:0;height:0;"></div>
+  </div>
+
+  <!-- Footer chip row -->
+  <div class="boot-footer">
+    <span class="boot-chip"><span class="boot-chip-dot"></span>v3.0</span>
+    <span class="boot-chip">Workspace</span>
+    <span class="boot-chip">AI Ready</span>
+  </div>
+</div>
+<!-- COMMAND PALETTE -->
+<div class="hidden" id="command-palette">
+<div class="command-input">
+<input autocomplete="off" class="input" id="command-input" placeholder="Type a command or search..." type="text"/>
+</div>
+<div class="command-list" id="command-list"></div>
+</div>
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="settings-modal">
+
+<div class="modal">
+<div class="modal-header">
+  <div class="header-icon"><i class="fas fa-sliders-h"></i></div>
+  <h3>IDE Settings</h3>
+  <button class="btn icon small" onclick="Settings.hide()" style="margin-left:auto;"><i class="fas fa-times"></i></button>
+</div>
+
+<div class="settings-body">
+  <!-- Sidebar nav -->
+  <div class="settings-sidebar">
+    <div class="settings-nav-section-label">Workspace</div>
+    <div class="settings-nav-item active" data-stab="editor" onclick="switchSettingsTab('editor',this)">
+      <span class="nav-icon"><i class="fas fa-code"></i></span> Editor
+    </div>
+    <div class="settings-nav-item" data-stab="appearance" onclick="switchSettingsTab('appearance',this)">
+      <span class="nav-icon"><i class="fas fa-palette"></i></span> Appearance
+    </div>
+    <div class="settings-nav-item" data-stab="terminal" onclick="switchSettingsTab('terminal',this)">
+      <span class="nav-icon"><i class="fas fa-terminal"></i></span> Terminal
+    </div>
+    <div class="settings-nav-section-label" style="margin-top:8px;">System</div>
+    <div class="settings-nav-item" data-stab="features" onclick="switchSettingsTab('features',this)">
+      <span class="nav-icon"><i class="fas fa-puzzle-piece"></i></span> Features
+    </div>
+    <div class="settings-nav-item" data-stab="shortcuts" onclick="switchSettingsTab('shortcuts',this)">
+      <span class="nav-icon"><i class="fas fa-keyboard"></i></span> Shortcuts
+    </div>
+    <div class="settings-nav-section-label" style="margin-top:8px;">Integrations</div>
+    <div class="settings-nav-item" data-stab="ai" onclick="switchSettingsTab('ai',this)">
+      <span class="nav-icon"><i class="fas fa-robot"></i></span> AI Assistant
+    </div>
+  </div>
+
+  <!-- Content area -->
+  <div class="settings-content-area">
+
+    <!-- ── EDITOR ── -->
+    <div class="settings-tab" id="settings-editor">
+      <div class="settings-section-title"><i class="fas fa-code"></i> Editor</div>
+      <div class="settings-section-desc">Tuỳ chỉnh trình soạn thảo Monaco</div>
+
+      <div class="settings-group">
+        <div class="settings-group-label">Typography</div>
+        <div class="setting-row-v25">
+          <div><div class="s-label">Font Size</div><div class="s-desc">Cỡ chữ trong editor (px)</div></div>
+          <div class="s-ctrl">
+            <div class="s-stepper">
+              <button onclick="Settings.changeFontSize(-1)"><i class="fas fa-minus"></i></button>
+              <input class="s-input" id="font-size-input" type="number" min="8" max="32" value="14" style="width:60px;"/>
+              <button onclick="Settings.changeFontSize(1)"><i class="fas fa-plus"></i></button>
+            </div>
+          </div>
+        </div>
+        <div class="setting-row-v25">
+          <div><div class="s-label">Tab Size</div><div class="s-desc">Số spaces cho một tab</div></div>
+          <div class="s-ctrl">
+            <div class="s-stepper">
+              <button onclick="Settings.changeTabSize(-1)">-</button>
+              <span id="tab-size-value">4</span>
+              <button onclick="Settings.changeTabSize(1)">+</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <div class="settings-group-label">Layout</div>
+        <div class="setting-row-v25">
+          <div><div class="s-label">Word Wrap</div><div class="s-desc">Tự động xuống dòng khi quá dài</div></div>
+          <label class="switch"><input id="word-wrap-toggle" type="checkbox"/><span class="slider"></span></label>
+        </div>
+        <div class="setting-row-v25">
+          <div><div class="s-label">Minimap</div><div class="s-desc">Bản đồ thu nhỏ bên phải editor</div></div>
+          <label class="switch"><input id="minimap-toggle" type="checkbox"/><span class="slider"></span></label>
+        </div>
+        <div class="setting-row-v25">
+          <div><div class="s-label">Line Numbers</div><div class="s-desc">Hiển thị số dòng</div></div>
+          <label class="switch"><input checked id="line-numbers-toggle" type="checkbox"/><span class="slider"></span></label>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <div class="settings-group-label">Auto Save</div>
+        <div class="setting-row-v25">
+          <div><div class="s-label">Auto Save</div><div class="s-desc">Tự động lưu khi code thay đổi</div></div>
+          <label class="switch"><input checked id="auto-save-toggle" type="checkbox"/><span class="slider"></span></label>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── APPEARANCE ── -->
+    <div class="settings-tab hidden" id="settings-appearance">
+      <div class="settings-section-title"><i class="fas fa-palette"></i> Appearance</div>
+      <div class="settings-section-desc">Giao diện và màu sắc của IDE</div>
+
+      <div class="settings-group">
+        <div class="settings-group-label">Color Theme</div>
+        <div class="theme-grid-v25">
+          <div class="theme-card-v25 active" data-theme="dark" onclick="Settings.selectTheme('dark',this)">
+            <div class="preview" style="background:#09090b;">
+              <div class="bar" style="background:#1c1c1e;"></div>
+              <div class="lines">
+                <div class="line" style="width:70%;background:#6366f1;"></div>
+                <div class="line" style="width:50%;background:#22c55e;"></div>
+                <div class="line" style="width:60%;background:#f59e0b;"></div>
+              </div>
+            </div>
+            <div class="label">Dark</div>
+          </div>
+          <div class="theme-card-v25" data-theme="light" onclick="Settings.selectTheme('light',this)">
+            <div class="preview" style="background:#ffffff; border-bottom:1px solid #eee;">
+              <div class="bar" style="background:#f4f4f5;"></div>
+              <div class="lines">
+                <div class="line" style="width:70%;background:#6366f1;opacity:0.7;"></div>
+                <div class="line" style="width:50%;background:#16a34a;opacity:0.7;"></div>
+                <div class="line" style="width:60%;background:#d97706;opacity:0.7;"></div>
+              </div>
+            </div>
+            <div class="label" style="background:#f9fafb;color:#52525b;border-color:#eee;">Light</div>
+          </div>
+          <div class="theme-card-v25" data-theme="night" onclick="Settings.selectTheme('night',this)">
+            <div class="preview" style="background:#0a0a12;">
+              <div class="bar" style="background:#111122;"></div>
+              <div class="lines">
+                <div class="line" style="width:70%;background:#7c3aed;"></div>
+                <div class="line" style="width:50%;background:#0ea5e9;"></div>
+                <div class="line" style="width:60%;background:#ec4899;"></div>
+              </div>
+            </div>
+            <div class="label">Night</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <div class="settings-group-label">Motion & Density</div>
+        <div class="setting-row-v25">
+          <div><div class="s-label">Animations</div><div class="s-desc">Hiệu ứng chuyển động giao diện</div></div>
+          <label class="switch"><input checked id="animation-toggle" type="checkbox"/><span class="slider"></span></label>
+        </div>
+        <div class="setting-row-v25">
+          <div><div class="s-label">Reduce Motion</div><div class="s-desc">Tắt transitions để tăng performance</div></div>
+          <label class="switch"><input id="reduce-motion-toggle" type="checkbox"/><span class="slider"></span></label>
+        </div>
+        <div class="setting-row-v25">
+          <div><div class="s-label">Compact Mode</div><div class="s-desc">Giao diện chặt hơn, hiện nhiều file hơn</div></div>
+          <label class="switch"><input id="compact-mode-toggle" type="checkbox"/><span class="slider"></span></label>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TERMINAL ── -->
+    <div class="settings-tab hidden" id="settings-terminal">
+      <div class="settings-section-title"><i class="fas fa-terminal"></i> Terminal</div>
+      <div class="settings-section-desc">Cấu hình terminal tích hợp</div>
+      <div class="settings-group">
+        <div class="settings-group-label">Display</div>
+        <div class="setting-row-v25">
+          <div><div class="s-label">Font Size</div><div class="s-desc">Cỡ chữ terminal</div></div>
+          <div class="s-ctrl">
+            <div class="s-stepper">
+              <button onclick="Settings.changeTerminalFontSize(-1)">-</button>
+              <input id="terminal-font-size-input" type="number" min="8" max="32" style="width:60px;" class="s-input"/>
+              <button onclick="Settings.changeTerminalFontSize(1)">+</button>
+            </div>
+          </div>
+        </div>
+        <div class="setting-row-v25">
+          <div><div class="s-label">Cursor Blink</div><div class="s-desc">Con trỏ nhấp nháy trong terminal</div></div>
+          <label class="switch"><input id="terminal-cursor-blink-toggle" type="checkbox"/><span class="slider"></span></label>
+        </div>
+        <div class="setting-row-v25">
+          <div><div class="s-label">Cursor Style</div><div class="s-desc">Block / underline / bar</div></div>
+          <select id="terminal-cursor-style-select" class="s-select">
+            <option value="block">Block ▋</option>
+            <option value="underline">Underline _</option>
+            <option value="bar">Bar |</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── FEATURES ── -->
+    <div class="settings-tab hidden" id="settings-features">
+      <div class="settings-section-title"><i class="fas fa-puzzle-piece"></i> Features</div>
+      <div class="settings-section-desc">Bật / tắt các tính năng của IDE</div>
+      <div class="settings-group">
+        <div class="settings-group-label">Session</div>
+        <div class="setting-row-v25">
+          <div><div class="s-label">Restore Session</div><div class="s-desc">Mở lại tabs từ phiên làm việc trước</div></div>
+          <label class="switch"><input id="restore-session-toggle" type="checkbox"/><span class="slider"></span></label>
+        </div>
+        <div class="setting-row-v25">
+          <div><div class="s-label">Persist Cursor & Scroll</div><div class="s-desc">Ghi nhớ vị trí con trỏ và scroll mỗi file</div></div>
+          <label class="switch"><input id="persist-cursor-toggle" type="checkbox"/><span class="slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-group">
+        <div class="settings-group-label">Editor Features</div>
+        <div class="setting-row-v25">
+          <div><div class="s-label">CodeLens</div><div class="s-desc">Hiển thị references và actions inline</div></div>
+          <label class="switch"><input id="codelens-toggle" type="checkbox"/><span class="slider"></span></label>
+        </div>
+        <div class="setting-row-v25">
+          <div><div class="s-label">Breadcrumbs</div><div class="s-desc">Thanh đường dẫn file phía trên editor</div></div>
+          <label class="switch"><input id="breadcrumbs-toggle" type="checkbox"/><span class="slider"></span></label>
+        </div>
+        <div class="setting-row-v25">
+          <div><div class="s-label">Snippets & Suggestions</div><div class="s-desc">Gợi ý code và snippet completion</div></div>
+          <label class="switch"><input id="snippets-toggle" type="checkbox"/><span class="slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-group">
+        <div class="settings-group-label">Tools</div>
+        <div class="setting-row-v25">
+          <div><div class="s-label">Live Preview</div><div class="s-desc">Tự động reload preview khi code thay đổi</div></div>
+          <label class="switch"><input id="live-preview-toggle" type="checkbox"/><span class="slider"></span></label>
+        </div>
+        <div class="setting-row-v25">
+          <div><div class="s-label">Git Integration</div><div class="s-desc">Hiển thị git status và diff helpers</div></div>
+          <label class="switch"><input id="git-toggle" type="checkbox"/><span class="slider"></span></label>
+        </div>
+      </div>
+      <!-- FIX-PISTON-UI: Settings for custom Piston endpoint -->
+      <div class="settings-group">
+        <div class="settings-group-label">🚀 Code Runner (Piston)</div>
+        <div class="setting-row-v25" style="flex-direction:column;align-items:flex-start;gap:8px;">
+          <div><div class="s-label">Custom Piston Server URL</div><div class="s-desc">Dùng server Piston riêng khi các server mặc định không hoạt động. Để trống = dùng server mặc định.</div></div>
+          <div style="display:flex;gap:8px;width:100%;">
+            <input id="piston-endpoint-input" type="url" placeholder="https://your-piston-server.com/api/v2/execute"
+              style="flex:1;padding:6px 10px;background:#18181b;border:1px solid #3f3f46;border-radius:6px;color:#e4e4e7;font-size:12px;font-family:'JetBrains Mono',monospace;"
+              oninput="this.style.borderColor=this.value?'#6366f1':'#3f3f46'"/>
+            <button onclick="(function(){const v=document.getElementById('piston-endpoint-input').value.trim();if(v){localStorage.setItem('procode_piston_endpoint',v);if(window.PistonAPI)window.PistonAPI._activeEndpoint=null;V32Toast&&V32Toast.show('✅ Piston endpoint saved','success',3000);}else{localStorage.removeItem('procode_piston_endpoint');if(window.PistonAPI)window.PistonAPI._activeEndpoint=null;V32Toast&&V32Toast.show('🔄 Using default mirrors','info',2000);}})()"
+              class="btn small primary" style="white-space:nowrap;">Save</button>
+          </div>
+          <div id="piston-endpoint-status" style="font-size:11px;color:#71717a;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SHORTCUTS ── -->
+    <div class="settings-tab hidden" id="settings-shortcuts">
+      <div class="settings-section-title"><i class="fas fa-keyboard"></i> Keyboard Shortcuts</div>
+      <div class="settings-section-desc">Tham khảo phím tắt của ProCode IDE</div>
+      <div class="settings-group">
+        <div class="settings-group-label">Thao tác cơ bản</div>
+        <div class="setting-row-v25"><div><div class="s-label">Lưu file</div></div><span class="shortcut-badge">Ctrl + S</span></div>
+        <div class="setting-row-v25"><div><div class="s-label">Tạo file mới</div></div><span class="shortcut-badge">Ctrl + N</span></div>
+        <div class="setting-row-v25"><div><div class="s-label">Mở file</div></div><span class="shortcut-badge">Ctrl + O</span></div>
+        <div class="setting-row-v25"><div><div class="s-label">Command Palette</div></div><span class="shortcut-badge">Ctrl + P</span></div>
+        <div class="setting-row-v25"><div><div class="s-label">Chạy code (Run)</div></div><span class="shortcut-badge">F5</span></div>
+      </div>
+      <div class="settings-group">
+        <div class="settings-group-label">Editor</div>
+        <div class="setting-row-v25"><div><div class="s-label">Split editor</div></div><span class="shortcut-badge">Ctrl + \</span></div>
+        <div class="setting-row-v25"><div><div class="s-label">Toggle Preview</div></div><span class="shortcut-badge">Ctrl + B</span></div>
+        <div class="setting-row-v25"><div><div class="s-label">Format code</div></div><span class="shortcut-badge">Shift + Alt + F</span></div>
+        <div class="setting-row-v25"><div><div class="s-label">Go to line</div></div><span class="shortcut-badge">Ctrl + G</span></div>
+        <div class="setting-row-v25"><div><div class="s-label">Find & Replace</div></div><span class="shortcut-badge">Ctrl + H</span></div>
+      </div>
+      <div class="settings-group">
+        <div class="settings-group-label">AI Assistant (v3.0 Claude)</div>
+        <div class="setting-row-v25"><div><div class="s-label">Mở/đóng AI Assistant</div></div><span class="shortcut-badge">Ctrl + Shift + A</span></div>
+        <div class="setting-row-v25"><div><div class="s-label">Giải thích code đang chọn</div><div class="s-desc">Explain selected code</div></div><span class="shortcut-badge">Ctrl + Shift + E</span></div>
+        <div class="setting-row-v25"><div><div class="s-label">Fix bugs tự động</div><div class="s-desc">Fix bugs in current code</div></div><span class="shortcut-badge">Ctrl + Shift + X</span></div>
+        <div class="setting-row-v25"><div><div class="s-label">AI Context Menu</div><div class="s-desc">Click chuột phải trong editor</div></div><span class="shortcut-badge">Right Click</span></div>
+      </div>
+    </div>
+
+    <!-- ── AI ── -->
+    <div class="settings-tab hidden" id="settings-ai">
+      <div class="settings-section-title"><i class="fas fa-robot"></i> Claude AI Assistant</div>
+      <div class="settings-section-desc">v3.0 — Powered by Anthropic Claude API với streaming real-time responses</div>
+      <div class="settings-group">
+        <div class="settings-group-label">General</div>
+        <div class="setting-row-v25">
+          <div><div class="s-label">Enable AI Assistant</div><div class="s-desc">Bật / tắt toàn bộ tính năng AI</div></div>
+          <label class="switch"><input id="ai-enabled-toggle" type="checkbox"/><span class="slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-group">
+        <div class="settings-group-label">🔑 API Configuration</div>
+        <div class="setting-row-v25">
+          <div><div class="s-label">Anthropic API Key</div><div class="s-desc">Lưu local trong browser, không gửi lên server. Lấy tại <a href="https://console.anthropic.com" target="_blank" style="color:#818cf8;">console.anthropic.com</a></div></div>
+          <div class="api-key-wrapper">
+            <input id="ai-api-key-input" type="password" placeholder="sk-ant-api03-..." class="s-input" style="width:240px;"/>
+            <button class="toggle-eye" onclick="this.previousElementSibling.type=this.previousElementSibling.type==='password'?'text':'password'" title="Toggle visibility"><i class="fas fa-eye"></i></button>
+          </div>
+        </div>
+        <div class="setting-row-v25">
+          <div><div class="s-label">Model</div><div class="s-desc">Chọn model Claude</div></div>
+          <select id="ai-model-input" class="s-select" style="width:200px;" onchange="document.getElementById('ai-model-input').value=this.value">
+            <option value="claude-sonnet-4-6">claude-sonnet-4-6 (Recommended)</option>
+            <option value="claude-opus-4-6">claude-opus-4-6 (Most Powerful)</option>
+            <option value="claude-haiku-4-5-20251001">claude-haiku-4-5 (Fastest)</option>
+          </select>
+        </div>
+      </div>
+      <div class="settings-group">
+        <div class="settings-group-label">⚙️ Generation Parameters</div>
+        <div class="setting-row-v25">
+          <div><div class="s-label">Temperature</div><div class="s-desc">0.0 = chính xác, 1.0 = sáng tạo. Khuyến nghị: 0.7</div></div>
+          <input id="ai-temperature-input" type="number" step="0.1" min="0" max="1" class="s-input" style="width:80px;"/>
+        </div>
+        <div class="setting-row-v25">
+          <div><div class="s-label">Max Tokens</div><div class="s-desc">Độ dài tối đa của phản hồi. Tối đa 8000</div></div>
+          <input id="ai-maxTokens-input" type="number" min="64" max="8000" class="s-input" style="width:100px;"/>
+        </div>
+      </div>
+      <div class="settings-group">
+        <div class="settings-group-label">📋 Hướng dẫn sử dụng</div>
+        <div style="padding:14px 16px;font-size:12px;color:#71717a;line-height:1.8;">
+          <div style="margin-bottom:8px;"><strong style="color:#a1a1aa;">Cách lấy API key:</strong></div>
+          <ol style="margin-left:16px;color:#52525b;">
+            <li>Truy cập <span style="color:#818cf8;">console.anthropic.com</span></li>
+            <li>Đăng nhập hoặc tạo tài khoản</li>
+            <li>Vào API Keys → Create Key</li>
+            <li>Copy key dạng <code style="background:#1a1a22;padding:2px 5px;border-radius:3px;">sk-ant-...</code></li>
+            <li>Dán vào ô API Key ở trên và lưu</li>
+          </ol>
+          <div style="margin-top:10px;padding:8px;background:rgba(99,102,241,0.06);border-radius:6px;border:1px solid rgba(99,102,241,0.15);">
+            <i class="fas fa-shield-alt" style="color:#6366f1;margin-right:6px;"></i>
+            <strong style="color:#818cf8;">Bảo mật:</strong> API key chỉ lưu trong localStorage của trình duyệt, không bao giờ gửi đi đâu ngoài <code>api.anthropic.com</code>.
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content-area -->
+</div><!-- /settings-body -->
+
+<div class="settings-footer-v25">
+  <button class="btn-cancel" onclick="Settings.hide()">Huỷ</button>
+  <button class="btn-save" onclick="Settings.save()"><i class="fas fa-check"></i> Lưu cài đặt</button>
+</div>
+</div>
+</div>
+
+
+
+<!-- PROJECT TEMPLATES MODAL -->
+<div class="modal-overlay" id="templates-modal">
+<div class="modal" style="width:800px;">
+<div class="modal-header">
+<h3 style="font-weight:600; font-size:16px;"><i class="fas fa-layer-group"></i> New Project</h3>
+<button class="btn icon small" onclick="ProjectTemplates.hide()"><i class="fas fa-times"></i></button>
+</div>
+<div class="modal-body">
+<div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:16px;">
+<div class="template-card" data-template="vanilla">
+<div style="background:linear-gradient(135deg, #667eea, #764ba2); height:120px; border-radius:8px 8px 0 0;"></div>
+<div style="padding:16px;">
+<div style="font-weight:600; margin-bottom:4px;">Vanilla Web</div>
+<div style="font-size:12px; color:var(--text-dim); line-height:1.4;">HTML, CSS, JavaScript starter</div>
+</div>
+</div>
+<div class="template-card" data-template="react-ts">
+<div style="background:linear-gradient(135deg, #61dafb, #3178c6); height:120px; border-radius:8px 8px 0 0;"></div>
+<div style="padding:16px;">
+<div style="font-weight:600; margin-bottom:4px;">React + TypeScript</div>
+<div style="font-size:12px; color:var(--text-dim); line-height:1.4;">Modern React with TypeScript</div>
+</div>
+</div>
+<div class="template-card" data-template="react-umd">
+<div style="background:linear-gradient(135deg, #38bdf8, #0ea5e9); height:120px; border-radius:8px 8px 0 0;"></div>
+<div style="padding:16px;">
+<div style="font-weight:600; margin-bottom:4px;">React UMD (No Bundler)</div>
+<div style="font-size:12px; color:var(--text-dim); line-height:1.4;">UMD globals with inline app.js</div>
+</div>
+</div>
+<div class="template-card" data-template="vue-umd">
+<div style="background:linear-gradient(135deg, #34d399, #10b981); height:120px; border-radius:8px 8px 0 0;"></div>
+<div style="padding:16px;">
+<div style="font-weight:600; margin-bottom:4px;">Vue 3 UMD (No Bundler)</div>
+<div style="font-size:12px; color:var(--text-dim); line-height:1.4;">Vue global build + inline app</div>
+</div>
+</div>
+<div class="template-card" data-template="python-data">
+<div style="background:linear-gradient(135deg, #3776ab, #ffd43b); height:120px; border-radius:8px 8px 0 0;"></div>
+<div style="padding:16px;">
+<div style="font-weight:600; margin-bottom:4px;">Python Data Science</div>
+<div style="font-size:12px; color:var(--text-dim); line-height:1.4;">Data analysis with Python</div>
+</div>
+</div>
+</div>
+</div>
+<div class="modal-footer">
+<button class="btn" onclick="ProjectTemplates.hide()">Cancel</button>
+<button class="btn primary" onclick="ProjectTemplates.create()"><i class="fas fa-plus"></i> Create Project</button>
+</div>
+</div>
+</div>
+<header>
+  <!-- LOGO -->
+  <div class="logo">
+    <i class="fas fa-cube" style="color:var(--primary)"></i>
+    <span>PRO CODE</span>
+    <span class="version" style="background:linear-gradient(135deg,#6366f1,#ec4899)!important">v3.0</span>
+  </div>
+  <div style="width:1px;height:20px;background:#3f3f46;margin:0 12px;flex-shrink:0;"></div>
+
+  <!-- PRIMARY FILE ACTIONS -->
+  <div class="flex ac gap-1" style="flex-shrink:0;">
+    <button class="btn icon" onclick="FS.createFilePrompt()" title="New File (Ctrl+N)"><i class="fas fa-file-plus"></i></button>
+    <button class="btn icon" onclick="FS.save()" title="Save (Ctrl+S)"><i class="fas fa-save"></i></button>
+  </div>
+  <div style="width:1px;height:20px;background:#3f3f46;margin:0 10px;flex-shrink:0;"></div>
+
+  <!-- SEARCH BAR (CENTER) -->
+  <div class="flex ac gap-2" style="flex:1;min-width:0;max-width:420px;margin:0 auto;background:#27272a;border-radius:8px;padding:4px 8px;border:1px solid #3f3f46;">
+    <i class="fas fa-search" style="color:#52525b;font-size:12px;flex-shrink:0;"></i>
+    <input class="input" id="spotlight" placeholder="Search files, commands... (Ctrl+P)" style="border:none;background:transparent;width:100%;height:26px;padding:0;font-size:12px;" onclick="CommandPalette.show()"/>
+  </div>
+
+  <!-- RIGHT: LAYOUT + RUN + MENU -->
+  <div class="flex ac gap-1" style="flex-shrink:0;margin-left:12px;">
+    <button class="btn icon" onclick="Layout.toggleLayout('terminal')" title="Terminal (Ctrl+`)"><i class="fas fa-terminal"></i></button>
+    <button class="btn icon" onclick="Layout.toggleLayout('preview')" title="Preview (Ctrl+B)"><i class="fas fa-eye"></i></button>
+    <div style="width:1px;height:20px;background:#3f3f46;margin:0 6px;"></div>
+    <button class="btn primary" id="run-btn" onclick="Runner.exec()" title="Run (F5)" style="gap:6px;padding:0 16px;">
+      <i class="fas fa-play"></i> RUN
+    </button>
+    <button class="btn icon" onclick="Debugger.toggle()" title="Breakpoints &amp; Expression Evaluator (F9) — not a step debugger"><i class="fas fa-bug"></i></button>
+    <div style="width:1px;height:20px;background:#3f3f46;margin:0 6px;"></div>
+
+    <!-- HAMBURGER MENU BUTTON -->
+    <div style="position:relative;" id="more-menu-wrapper">
+      <button class="hm-trigger" id="more-menu-btn" onclick="toggleMoreMenu()" title="More options (Ctrl+Shift+M)">
+        <span class="hm-bar"></span>
+        <span class="hm-bar"></span>
+        <span class="hm-bar"></span>
+      </button>
+      <!-- DROPDOWN MENU -->
+      <div id="more-menu-dropdown">
+        <!-- Search filter -->
+        <div class="mm-search">
+          <i class="fas fa-search"></i>
+          <input id="mm-filter-input" placeholder="Search features…" oninput="filterMoreMenu(this.value)" autocomplete="off">
+        </div>
+        <!-- File Section -->
+        <div class="mm-label" data-section="file">File</div>
+        <div class="mm-item" onclick="FS.createFolderPrompt(); closeMoreMenu()">
+          <i class="fas fa-folder-plus"></i><span>New Folder</span>
+        </div>
+        <div class="mm-item" onclick="FS.importPrompt(); closeMoreMenu()">
+          <i class="fas fa-folder-open"></i><span>Import Files / Folder / ZIP</span>
+        </div>
+        <div class="mm-item" onclick="FS.exportZip(); closeMoreMenu()">
+          <i class="fas fa-download"></i><span>Export Project as ZIP</span>
+        </div>
+        <div class="mm-sep"></div>
+        <!-- Editor Section -->
+        <div class="mm-label">Editor</div>
+        <div class="mm-item" onclick="Layout.splitEditor(); closeMoreMenu()">
+          <i class="fas fa-columns"></i><span>Split Editor</span><span class="mm-kbd">Ctrl+\</span>
+        </div>
+        <div class="mm-item" onclick="Search.findInProject(); closeMoreMenu()">
+          <i class="fas fa-search-plus"></i><span>Find in Files</span><span class="mm-kbd">Ctrl+F</span>
+        </div>
+        <div class="mm-item" onclick="Search.replace(); closeMoreMenu()">
+          <i class="fas fa-exchange-alt"></i><span>Find & Replace</span><span class="mm-kbd">Ctrl+H</span>
+        </div>
+        <div class="mm-item" onclick="CommandPalette.show(); closeMoreMenu()">
+          <i class="fas fa-magic"></i><span>Command Palette</span><span class="mm-kbd">Ctrl+P</span>
+        </div>
+        <div class="mm-item" onclick="(window.EditorManager&&EditorManager.formatCode&&EditorManager.formatCode())||(window.monaco&&monaco.editor&&monaco.editor.getEditors().find(e=>e.hasTextFocus())&&monaco.editor.getEditors().find(e=>e.hasTextFocus()).getAction('editor.action.formatDocument').run()); closeMoreMenu()">
+          <i class="fas fa-paint-roller"></i><span>Format Document</span><span class="mm-kbd">Shift+Alt+F</span>
+        </div>
+        <div class="mm-item" onclick="(window.ProCodeDiagnostics&&ProCodeDiagnostics.toggle&&ProCodeDiagnostics.toggle()); closeMoreMenu()">
+          <i class="fas fa-stethoscope"></i><span>Health Check &amp; Diagnostics</span><span class="mm-kbd">Ctrl+Shift+H</span>
+        </div>
+        <div class="mm-sep"></div>
+        <!-- Tools Section -->
+        <div class="mm-label">Tools</div>
+        <div class="mm-item" onclick="if(typeof SnippetManager!=='undefined')SnippetManager.toggle(); closeMoreMenu()">
+          <i class="fas fa-puzzle-piece"></i><span>Snippets</span>
+        </div>
+        <div class="mm-item" onclick="if(typeof TodoTracker!=='undefined')TodoTracker.toggle(); closeMoreMenu()">
+          <i class="fas fa-tasks"></i><span>TODO Tracker</span>
+        </div>
+        <div class="mm-item" onclick="if(typeof ZenMode!=='undefined')ZenMode.toggle(); closeMoreMenu()">
+          <i class="fas fa-expand"></i><span>Zen Mode</span>
+        </div>
+        <div class="mm-item" onclick="if(window.Pomodoro)window.Pomodoro.show(); closeMoreMenu()">
+          <i class="fas fa-stopwatch"></i><span>Pomodoro Timer</span>
+        </div>
+        <div class="mm-item" onclick="if(window.CodeMetrics)window.CodeMetrics.toggle(); closeMoreMenu()">
+          <i class="fas fa-chart-line"></i><span>Code Metrics</span>
+        </div>
+        <div class="mm-item" onclick="if(window.Templates)window.Templates.toggle(); closeMoreMenu()">
+          <i class="fas fa-clipboard-list"></i><span>Code Templates</span>
+        </div>
+        <div class="mm-item" onclick="if(typeof ShortcutsHelp!=='undefined')ShortcutsHelp.show(); closeMoreMenu()">
+          <i class="fas fa-keyboard"></i><span>Keyboard Shortcuts</span>
+        </div>
+        <div class="mm-sep"></div>
+        <!-- Advanced Tools (v29+) -->
+        <div class="mm-label">Advanced</div>
+        <div class="mm-item" onclick="if(window.GitEngine)window.GitEngine.toggle(); closeMoreMenu()">
+          <i class="fas fa-code-branch"></i><span>Git Engine</span>
+        </div>
+        <div class="mm-item" onclick="if(window.RestClient)window.RestClient.toggle(); closeMoreMenu()">
+          <i class="fas fa-plug"></i><span>REST Client</span>
+        </div>
+        <div class="mm-item" onclick="if(window.TestRunner)window.TestRunner.toggle(); closeMoreMenu()">
+          <i class="fas fa-vial"></i><span>Test Runner</span>
+        </div>
+        <div class="mm-item" onclick="if(window.Profiler)window.Profiler.toggle(); closeMoreMenu()">
+          <i class="fas fa-chart-bar"></i><span>Profiler</span>
+        </div>
+        <div class="mm-item" onclick="if(window.JSONExplorer)window.JSONExplorer.toggle(); closeMoreMenu()">
+          <i class="fas fa-brackets-curly"></i><span>JSON Explorer</span>
+        </div>
+        <div class="mm-item" onclick="if(window.RegexLab)window.RegexLab.toggle(); closeMoreMenu()">
+          <i class="fas fa-flask"></i><span>Regex Lab</span>
+        </div>
+        <div class="mm-item" onclick="if(window.DiffViewer)window.DiffViewer.toggle(); closeMoreMenu()">
+          <i class="fas fa-code-compare"></i><span>Diff Viewer</span>
+        </div>
+        <div class="mm-item" onclick="if(window.V32ZenCanvas)window.V32ZenCanvas.toggle(); closeMoreMenu()">
+          <i class="fas fa-expand-arrows-alt"></i><span>Zen Canvas</span><span class="mm-kbd">Alt+Z</span>
+        </div>
+        <div class="mm-item" onclick="if(window.V32RAG)window.V32RAG.show(); closeMoreMenu()">
+          <i class="fas fa-brain"></i><span>Semantic Search</span><span class="mm-kbd">Alt+S</span>
+        </div>
+        <div class="mm-item" onclick="if(window.V32Radar)window.V32Radar.toggle(); closeMoreMenu()">
+          <i class="fas fa-map"></i><span>Radar Map</span><span class="mm-kbd">Alt+M</span>
+        </div>
+        <div class="mm-item" onclick="if(window.V32ThemePainter)window.V32ThemePainter.toggle(); closeMoreMenu()">
+          <i class="fas fa-palette"></i><span>Theme Painter</span><span class="mm-kbd">Alt+P</span>
+        </div>
+        <div class="mm-item" onclick="if(window.V33DevTools)window.V33DevTools.toggle(); closeMoreMenu()">
+          <i class="fas fa-tools"></i><span>DevTools Panel</span><span class="mm-kbd">Ctrl+Shift+I</span>
+        </div>
+        <!-- Workspace Section -->
+        <div class="mm-label">Workspace</div>
+        <div class="mm-item" onclick="if(window.EnvManager)window.EnvManager.show(); closeMoreMenu()">
+          <i class="fas fa-key"></i><span>Environment Variables</span>
+        </div>
+        <div class="mm-item" onclick="if(window.ThemeDesigner)window.ThemeDesigner.show(); closeMoreMenu()">
+          <i class="fas fa-paint-brush"></i><span>Theme Designer</span>
+        </div>
+        <div class="mm-item" onclick="if(window.ColorPicker)window.ColorPicker.toggle(); closeMoreMenu()">
+          <i class="fas fa-eye-dropper"></i><span>Color Picker</span>
+        </div>
+        <div class="mm-item" onclick="if(window.BuildSystem)window.BuildSystem.show(); closeMoreMenu()">
+          <i class="fas fa-hammer"></i><span>Build System</span>
+        </div>
+        <div class="mm-item" onclick="if(window.CodeShare)window.CodeShare.show(); closeMoreMenu()">
+          <i class="fas fa-share-alt"></i><span>Share Code</span>
+        </div>
+        <div class="mm-item" onclick="if(window.GlobalSearch)window.GlobalSearch.toggle(); closeMoreMenu()">
+          <i class="fas fa-search"></i><span>Global Search</span>
+        </div>
+        <div class="mm-item" onclick="if(window.Inspector)window.Inspector.toggle(); closeMoreMenu()">
+          <i class="fas fa-mouse-pointer"></i><span>Element Inspector</span>
+        </div>
+        <div class="mm-sep"></div>
+        <!-- Analysis Section -->
+        <div class="mm-label">Analysis</div>
+        <div class="mm-item" onclick="if(window.GitGraph)window.GitGraph.show(); closeMoreMenu()">
+          <i class="fas fa-project-diagram"></i><span>Git Graph</span>
+        </div>
+        <div class="mm-item" onclick="if(window.SQLiteExplorer)window.SQLiteExplorer.show(); closeMoreMenu()">
+          <i class="fas fa-database"></i><span>SQLite Explorer</span>
+        </div>
+        <div class="mm-item" onclick="if(window.MarkdownPreview)window.MarkdownPreview.toggle(); closeMoreMenu()">
+          <i class="fab fa-markdown"></i><span>Markdown Preview</span>
+        </div>
+        <div class="mm-item" onclick="if(window.SessionNotes)window.SessionNotes.toggle(); closeMoreMenu()">
+          <i class="fas fa-sticky-note"></i><span>Session Notes</span>
+        </div>
+        <div class="mm-item" onclick="if(window.QuickSwitcher)window.QuickSwitcher.toggle(); closeMoreMenu()">
+          <i class="fas fa-bolt"></i><span>Quick Switcher</span><span class="mm-kbd">Ctrl+E</span>
+        </div>
+        <div class="mm-item" onclick="if(window.V33TokenInspector)window.V33TokenInspector.show(); closeMoreMenu()">
+          <i class="fas fa-palette"></i><span>CSS Token Inspector</span>
+        </div>
+        <div class="mm-sep"></div>
+        <!-- Danger zone -->
+        <div class="mm-item" onclick="FileSystem.resetWorkspace(); closeMoreMenu()" style="color:var(--warn);">
+          <i class="fas fa-trash-restore"></i><span>Reset Workspace</span>
+        </div>
+        <div class="mm-sep"></div>
+        <!-- ✦ NEW FEATURES -->
+        <div class="mm-label">AI &amp; Audio</div>
+        <div class="mm-item" id="mm-voice-btn" onclick="ProVoiceCommand.toggle(); closeMoreMenu()">
+          <i class="fas fa-microphone" id="mm-voice-icon" style="color:#a855f7"></i>
+          <span>Voice Command</span>
+          <span class="mm-badge" id="mm-voice-badge" style="
+            display:none; margin-left:auto; background:rgba(168,85,247,0.2);
+            color:#a855f7; border:1px solid rgba(168,85,247,0.4);
+            border-radius:99px; padding:1px 8px; font-size:9px; font-weight:700;
+          ">ON</span>
+        </div>
+        <div class="mm-item" id="mm-audio-btn" onclick="ProAdaptiveAudio.toggle(); closeMoreMenu()">
+          <i class="fas fa-headphones-alt" id="mm-audio-icon" style="color:#06b6d4"></i>
+          <span>Adaptive Audio</span>
+          <span class="mm-badge" id="mm-audio-badge" style="
+            display:none; margin-left:auto; background:rgba(6,182,212,0.2);
+            color:#06b6d4; border:1px solid rgba(6,182,212,0.4);
+            border-radius:99px; padding:1px 8px; font-size:9px; font-weight:700;
+          ">ON</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div id="workspace">
+<!-- ACTIVITY BAR -->
+<div class="act-bar">
+<div class="act-btn active" data-id="expl" onclick="Layout.setSide('expl')" title="Explorer">
+<i class="far fa-copy"></i>
+<div class="tooltip">Explorer</div>
+</div>
+<div class="act-btn" data-id="search" onclick="Layout.setSide('search')" title="Search">
+<i class="fas fa-search"></i>
+<div class="tooltip">Search</div>
+</div>
+<div class="act-btn" data-id="git" onclick="Layout.setSide('git')" title="Git">
+<i class="fas fa-code-branch"></i>
+<div class="tooltip">Git</div>
+</div>
+<div class="act-btn" data-id="ext" onclick="Layout.setSide('ext')" title="Extensions">
+<i class="fas fa-cubes"></i>
+<div class="tooltip">Extensions</div>
+</div>
+<div class="act-btn" data-id="debug" onclick="Layout.setSide('debug')" title="Debug">
+<i class="fas fa-bug"></i>
+<div class="tooltip">Debug</div>
+</div>
+<div style="flex:1"></div>
+<div class="act-btn" onclick="Settings.show()" title="Settings">
+<i class="fas fa-cog"></i>
+<div class="tooltip">Settings</div>
+</div>
+<div class="act-btn" onclick="AI.toggle()" style="color: var(--accent)" title="AI Assistant">
+<i class="fas fa-robot"></i>
+<div class="tooltip">AI Assistant</div>
+</div>
+</div>
+<!-- EXPLORER SIDEBAR -->
+<div class="sidebar active" id="side-expl">
+<div class="sb-head">
+<span>Explorer</span>
+<div class="flex gap-2">
+<i class="fas fa-file-medical" onclick="FS.createFilePrompt()" style="cursor:pointer" title="New File"></i>
+<i class="fas fa-folder-plus" onclick="FS.createFolderPrompt()" style="cursor:pointer" title="New Folder"></i>
+<i class="fas fa-sync-alt" onclick="FS.refreshTree()" style="cursor:pointer" title="Refresh"></i>
+</div>
+</div>
+<div class="tree" id="file-tree"></div>
+<div class="sb-head" style="margin-top:8px;">
+<span>Outline</span>
+</div>
+<div class="tree" id="outline-tree" style="height:200px;"></div>
+</div>
+<!-- SEARCH SIDEBAR -->
+<div class="sidebar" id="side-search">
+<div class="sb-head"><span>Search</span></div>
+<div style="padding:16px;">
+<div class="flex col gap-3">
+<input class="input" id="search-input" placeholder="Search in files..." type="text"/>
+<div class="flex gap-2">
+<input class="input" id="replace-input" placeholder="Replace with..." type="text"/>
+<button class="btn small" onclick="Search.replaceAll()">Replace All</button>
+</div>
+<div class="flex ac jb">
+<label style="font-size:12px;">
+<input id="case-sensitive" type="checkbox"/> Case sensitive
+                    </label>
+<label style="font-size:12px;">
+<input id="whole-word" type="checkbox"/> Whole word
+                    </label>
+</div>
+<button class="btn primary" onclick="Search.execute()"><i class="fas fa-search"></i> Search</button>
+</div>
+<div id="search-results" style="margin-top:16px; max-height:400px; overflow-y:auto;"></div>
+</div>
+</div>
+<!-- GIT SIDEBAR — v36 with real isomorphic-git wiring -->
+<div class="sidebar" id="side-git">
+<div class="sb-head"><span>Source Control</span></div>
+<div style="padding:16px;">
+<div class="flex col gap-3">
+<div style="font-size:12px; color:var(--text-dim);">Branch: <span id="git-branch-text" style="color:var(--primary); font-weight:600;">main</span></div>
+<div id="git-status" style="font-size:12px; color:var(--success);">
+<i class="fas fa-check-circle"></i> <span id="git-status-text">No changes</span>
+                </div>
+<button class="btn small" onclick="Git.status()"><i class="fas fa-list-ul"></i> Refresh Status</button>
+<button class="btn small primary" onclick="Git.commit()"><i class="fas fa-code-commit"></i> Commit Changes</button>
+<button class="btn small secondary" onclick="Git.push()"><i class="fas fa-cloud-upload-alt"></i> Push to Remote</button>
+<button class="btn small secondary" onclick="Git.pull()"><i class="fas fa-cloud-download-alt"></i> Pull from Remote</button>
+<div style="height:1px; background:var(--border); margin:6px 0;"></div>
+<button class="btn small secondary" onclick="Git.clone()"><i class="fas fa-clone"></i> Clone Repository</button>
+<button class="btn small secondary" onclick="Git.init()"><i class="fas fa-plus-circle"></i> Initialize Repo</button>
+<button class="btn small secondary" onclick="Git.log()"><i class="fas fa-history"></i> Show History</button>
+<div style="height:1px; background:var(--border); margin:6px 0;"></div>
+<button class="btn small secondary" onclick="(function(){var n=prompt('Author name:', localStorage.getItem('procode_git_author_name')||'');var e=prompt('Author email:', localStorage.getItem('procode_git_author_email')||'');if(n||e)Git.setAuthor(n,e);})()"><i class="fas fa-user-edit"></i> Set Author</button>
+<button class="btn small secondary" onclick="Git.setToken(prompt('GitHub Personal Access Token (leave blank to clear):',''))"><i class="fas fa-key"></i> Set Token</button>
+</div>
+</div>
+</div>
+<!-- RESIZER -->
+<div class="resizer r-w" id="rs-side" style="right:0"></div>
+<!-- MAIN EDITOR AREA -->
+<div id="main">
+<div class="tabs" id="tab-list"></div>
+<!-- EDITOR CONTAINER -->
+<div id="editor-container">
+<div class="editor-pane" id="editor-pane-1">
+<div id="monaco-root-1" style="width:100%; height:100%;"></div>
+</div>
+</div>
+<!-- EMPTY STATE -->
+<div id="empty-state">
+<!-- v36 animated welcome logo -->
+<div class="empty-icon es-logo" aria-hidden="true">
+  <div class="es-glow"></div>
+  <div class="es-ring es-ring-1"></div>
+  <div class="es-ring es-ring-2"></div>
+  <div class="es-ring es-ring-3"></div>
+  <div class="es-arc"></div>
+  <div class="es-core">
+    <div class="es-bracket es-bracket-l">&lt;</div>
+    <div class="es-slash">/</div>
+    <div class="es-bracket es-bracket-r">&gt;</div>
+  </div>
+  <span class="es-spark es-spark-1"></span>
+  <span class="es-spark es-spark-2"></span>
+  <span class="es-spark es-spark-3"></span>
+</div>
+<div class="empty-title">Welcome to Pro Code IDE</div>
+<div class="empty-subtitle">Open a file or create a new project to start coding</div>
+<div class="flex gap-3" style="margin-top:32px;">
+<button class="btn primary" onclick="ProjectTemplates.show()">
+<i class="fas fa-layer-group"></i> New Project
+                </button>
+<button class="btn secondary" onclick="FS.importPrompt()">
+<i class="fas fa-folder-open"></i> Open Folder
+                </button>
+<button class="btn secondary" onclick="Tutorial.start()">
+<i class="fas fa-graduation-cap"></i> Take Tutorial
+                </button>
+</div>
+<div style="margin-top:48px; display:grid; grid-template-columns:repeat(3, 1fr); gap:24px; max-width:600px;">
+<div style="text-align:center;">
+<div style="font-size:12px; color:var(--text-dim); margin-bottom:4px;">Multi-Language</div>
+<div style="font-size:11px; color:#71717a;">JavaScript, TypeScript, Python, HTML, CSS</div>
+</div>
+<div style="text-align:center;">
+<div style="font-size:12px; color:var(--text-dim); margin-bottom:4px;">Live Preview</div>
+<div style="font-size:11px; color:#71717a;">Real-time web preview with hot reload</div>
+</div>
+<div style="text-align:center;">
+<div style="font-size:12px; color:var(--text-dim); margin-bottom:4px;">AI Assistant</div>
+<div style="font-size:11px; color:#71717a;">Smart code completion and debugging</div>
+</div>
+</div>
+</div>
+<!-- BOTTOM PANEL -->
+<div class="hidden" id="panel-btm">
+<div class="resizer r-h" id="rs-panel"></div>
+<!-- TERMINAL HEADER -->
+<div class="term-header">
+  <!-- Left: Panel tabs -->
+  <div class="term-tabs" id="term-tabs-list">
+    <button class="term-tab active" data-panel="term" onclick="Panel.show('term');termTabActive(this)">
+      <i class="fas fa-terminal"></i>
+      <span>Terminal</span>
+      <span class="term-tab-badge" id="term-badge">1</span>
+    </button>
+    <button class="term-tab" data-panel="console" onclick="Panel.show('console');termTabActive(this)">
+      <i class="fas fa-code"></i>
+      <span>Console</span>
+      <span class="term-tab-badge" id="console-badge" style="display:none">0</span>
+    </button>
+    <button class="term-tab" data-panel="problems" onclick="Panel.show('problems');termTabActive(this)">
+      <i class="fas fa-exclamation-circle"></i>
+      <span>Problems</span>
+      <span class="term-tab-badge error" id="problems-badge" style="display:none">0</span>
+    </button>
+    <button class="term-tab" data-panel="output" onclick="Panel.show('output');termTabActive(this)">
+      <i class="fas fa-align-left"></i>
+      <span>Output</span>
+    </button>
+    <button class="term-new-btn" onclick="TerminalManager.newTab?.()" title="New Terminal">
+      <i class="fas fa-plus"></i>
+    </button>
+  </div>
+  <!-- Right: Actions -->
+  <div class="term-actions">
+    <button class="term-action-btn" onclick="TerminalManager.clear?.()" title="Clear terminal">
+      <i class="fas fa-ban"></i>
+    </button>
+    <button class="term-action-btn" id="term-split-btn" onclick="TerminalManager.split?.()" title="Split terminal">
+      <i class="fas fa-columns"></i>
+    </button>
+    <button class="term-action-btn" onclick="termMaximize()" title="Maximize / Restore" id="term-max-btn">
+      <i class="fas fa-expand-alt"></i>
+    </button>
+    <div class="term-sep-v"></div>
+    <button class="term-action-btn danger" onclick="Layout.toggleLayout('terminal')" title="Close panel">
+      <i class="fas fa-times"></i>
+    </button>
+  </div>
+</div>
+<!-- TERMINAL BODY -->
+<div id="panel-body">
+  <div id="term-host"></div>
+  <div class="hidden" id="console-host"></div>
+  <div class="hidden" id="problems-host"></div>
+  <div class="hidden" id="output-host">
+    <div id="output-content"></div>
+  </div>
+</div>
+</div>
+</div>
+<!-- PREVIEW PANEL -->
+<div class="resizer r-w hidden" id="rs-preview" style="left:0;"></div>
+<div id="preview-wrap">
+<div class="preview-toolbar" id="preview-toolbar-bar">
+  <!-- URL Bar -->
+  <div class="pv-url-row">
+    <i class="fas fa-globe" style="color:#888;font-size:11px;flex-shrink:0;"></i>
+    <input class="preview-url" id="preview-url" type="text" value="about:blank" spellcheck="false"/>
+    <button class="pv-btn" onclick="Runner.reload()" title="Reload (Ctrl+Shift+R)">
+      <i class="fas fa-sync-alt"></i>
+    </button>
+    <button class="pv-btn" onclick="Runner.popout()" title="Open in new window">
+      <i class="fas fa-external-link-alt"></i>
+    </button>
+    <button class="pv-btn" onclick="Inspector.toggle()" title="Toggle inspector">
+      <i class="fas fa-code"></i>
+    </button>
+    <button class="pv-btn pv-close" onclick="Layout.toggleLayout('preview')" title="Close preview">
+      <i class="fas fa-times"></i>
+    </button>
+  </div>
+  <!-- Device Switcher Row -->
+  <div class="pv-device-row">
+    <div class="pv-device-group" id="pv-device-group">
+      <button class="pv-device-btn active" data-device="responsive" onclick="PreviewDevice.set('responsive',this)"
+              title="Responsive (full width)">
+        <i class="fas fa-arrows-alt-h"></i>
+        <span>Responsive</span>
+      </button>
+      <button class="pv-device-btn" data-device="desktop" onclick="PreviewDevice.set('desktop',this)"
+              title="Desktop 1440×900">
+        <i class="fas fa-desktop"></i>
+        <span>Desktop</span>
+      </button>
+      <button class="pv-device-btn" data-device="laptop" onclick="PreviewDevice.set('laptop',this)"
+              title="Laptop 1280×800">
+        <i class="fas fa-laptop"></i>
+        <span>Laptop</span>
+      </button>
+      <button class="pv-device-btn" data-device="tablet" onclick="PreviewDevice.set('tablet',this)"
+              title="Tablet 768×1024">
+        <i class="fas fa-tablet-alt"></i>
+        <span>Tablet</span>
+      </button>
+      <button class="pv-device-btn" data-device="mobile" onclick="PreviewDevice.set('mobile',this)"
+              title="Mobile 375×812">
+        <i class="fas fa-mobile-alt"></i>
+        <span>Mobile</span>
+      </button>
+      <button class="pv-device-btn" data-device="mobile-sm" onclick="PreviewDevice.set('mobile-sm',this)"
+              title="Small Phone 320×568">
+        <i class="fas fa-mobile"></i>
+        <span>Small</span>
+      </button>
+    </div>
+    <div class="pv-size-badge" id="pv-size-badge">100%</div>
+    <button class="pv-btn" id="pv-rotate-btn" onclick="PreviewDevice.rotate()" title="Rotate device" style="display:none">
+      <i class="fas fa-sync"></i>
+    </button>
+  </div>
+</div>
+<div id="preview-iframe-wrapper" class="responsive-mode">
+<iframe id="preview-frame" sandbox="allow-scripts allow-forms allow-modals allow-popups allow-pointer-lock allow-downloads allow-presentation" style="border:none; background:white; position:absolute; top:0; left:0; width:100%; height:100%;" ></iframe>
+</div>
+        <div id="inspector-hint"><i class="fas fa-crosshairs" style="color:var(--primary)"></i><span>Inspector ON — click an element in preview</span><span class="pill" id="inspector-status">Waiting…</span></div>
+        <div id="inspector-panel">
+          <div class="inspector-header">
+            <div class="inspector-title"><i class="fas fa-code" style="color:var(--primary); margin-right:8px;"></i>Inspector</div>
+            <div class="actions">
+              <button class="btn small mini" id="inspector-copy-selector" title="Copy selector"><i class="fas fa-copy"></i></button>
+              <button class="btn small mini" id="inspector-copy-html" title="Copy outerHTML"><i class="fas fa-file-code"></i></button>
+              <button class="btn icon small mini" id="inspector-close" title="Close"><i class="fas fa-times"></i></button>
+            </div>
+          </div>
+          <div class="inspector-body">
+            <div class="kv"><div class="k">Selector</div><div class="v" id="inspector-selector">—</div></div>
+            <div class="kv"><div class="k">Tag</div><div class="v" id="inspector-tag">—</div></div>
+            <div class="kv"><div class="k">Text</div><div class="v" id="inspector-text">—</div></div>
+            <div class="kv"><div class="k">Box</div><div class="v" id="inspector-rect">—</div></div>
+            <div class="kv"><div class="k">Styles (subset)</div><pre id="inspector-styles">—</pre></div>
+            <div class="kv"><div class="k">outerHTML (truncated)</div><pre id="inspector-html">—</pre></div>
+          </div>
+        </div>
+
+</div>
+</div>
+<footer>
+<div class="f-stat">
+<span onclick="Git.branch()" title="Current branch">
+<i class="fas fa-code-branch"></i> main
+        </span>
+<span onclick="Git.status()" title="Git status">
+<i class="fas fa-cloud"></i> <span id="git-status-text">Local clean</span>
+</span>
+</div>
+<div class="f-stat">
+<span id="error-count" style="color:var(--error)" title="Errors">
+<i class="fas fa-times-circle"></i> 0
+        </span>
+<span id="warning-count" style="color:var(--warn)" title="Warnings">
+<i class="fas fa-exclamation-triangle"></i> 0
+        </span>
+<span id="info-count" style="color:var(--primary)" title="Info">
+<i class="fas fa-info-circle"></i> 0
+        </span>
+</div>
+<div style="flex:1"></div>
+<div class="f-stat">
+<span id="cursor-pos" title="Cursor position">Ln 1, Col 1</span>
+<span id="file-lang" title="File language">Plain Text</span>
+<span id="file-enc" title="File encoding">UTF-8</span>
+<span id="file-size" title="File size">0 B</span>
+<span id="line-endings" title="Line endings">LF</span>
+</div>
+<div class="status-dot" id="status-indicator" style="margin:0 16px;" title="IDE Status"></div>
+<div class="f-stat">
+<span onclick="Settings.show()" title="Settings">
+<i class="fas fa-cog"></i>
+</span>
+<span onclick="AI.toggle()" title="AI Assistant (Ctrl+Shift+A)" id="footer-ai-btn" style="position:relative;cursor:pointer;">
+<i class="fas fa-robot"></i>
+<span id="footer-ai-dot" style="position:absolute;top:-1px;right:-3px;width:6px;height:6px;background:#3f3f46;border-radius:50%;display:block;"></span>
+</span>
+<span onclick="Notifications.toggle()" title="Notifications">
+<i class="fas fa-bell"></i>
+</span>
+</div>
+</footer>
+<!-- AI ASSISTANT — v27 CLAUDE POWERED -->
+
+<div class="col" id="ai-float">
+<!-- Resize handle — left edge drag -->
+<div id="ai-resize-handle" style="position:absolute;left:0;top:0;bottom:0;width:5px;cursor:col-resize;z-index:10;background:transparent;" title="Drag to resize"></div>
+<!-- Header -->
+<div class="ai-panel-header">
+  <div class="ai-panel-title-row">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <i class="fas fa-robot" style="color:#818cf8;font-size:15px;"></i>
+      <span style="font-weight:700;font-size:14px;color:#e4e4e7;">Claude AI Assistant</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <div class="ai-panel-model-badge" id="ai-model-indicator" onclick="Settings.show(); setTimeout(()=>switchSettingsTab('ai',document.querySelector('[data-stab=ai]')),100)" title="Click to configure">
+        <span class="dot"></span>
+        <span id="ai-model-label">claude-sonnet-4-6</span>
+      </div>
+      <button class="btn icon small" onclick="AI.clear()" title="Clear chat" style="width:28px;height:28px;"><i class="fas fa-trash-alt"></i></button>
+      <button class="btn icon small" onclick="AI.exportChat()" title="Export chat" style="width:28px;height:28px;"><i class="fas fa-download"></i></button>
+      <button class="btn icon small" onclick="AI.toggle()" title="Close" style="width:28px;height:28px;"><i class="fas fa-times"></i></button>
+    </div>
+  </div>
+  <div class="ai-panel-ctx-bar" id="ai-ctx-bar">
+    <span style="font-size:10px;color:#3f3f46;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Context:</span>
+    <span class="ai-panel-ctx-pill" id="ai-ctx-file"><i class="fas fa-file-code"></i> <span id="ai-ctx-file-name">No file</span></span>
+    <span class="ai-panel-ctx-pill" id="ai-ctx-sel" style="display:none"><i class="fas fa-text-width"></i> Selection</span>
+    <span class="ai-panel-ctx-pill" id="ai-ctx-proj"><i class="fas fa-folder"></i> <span id="ai-ctx-file-count">0</span> files</span>
+  </div>
+</div>
+<!-- Quick Actions -->
+<div class="ai-panel-quick-actions">
+  <button class="ai-qa-btn" onclick="AI.quickAction('explain')"><i class="fas fa-search-plus"></i> Explain</button>
+  <button class="ai-qa-btn" onclick="AI.quickAction('fix')"><i class="fas fa-wrench"></i> Fix Bugs</button>
+  <button class="ai-qa-btn" onclick="AI.quickAction('optimize')"><i class="fas fa-bolt"></i> Optimize</button>
+  <button class="ai-qa-btn" onclick="AI.quickAction('review')"><i class="fas fa-eye"></i> Review</button>
+  <button class="ai-qa-btn" onclick="AI.quickAction('docs')"><i class="fas fa-book"></i> Add Docs</button>
+  <button class="ai-qa-btn" onclick="AI.quickAction('tests')"><i class="fas fa-vial"></i> Generate Tests</button>
+</div>
+<!-- Messages -->
+<div class="ai-panel-messages" id="ai-messages">
+<div class="msg-bubble msg-sys">
+<div style="font-weight:700;margin-bottom:8px;font-size:14px;">👋 Xin chào! Tôi là Claude AI Assistant.</div>
+<div style="margin-bottom:8px;color:#a5b4fc;">Tôi được tích hợp trực tiếp vào ProCode IDE và có thể đọc code của bạn.</div>
+<div style="font-size:12px;color:#6366f1;font-weight:600;margin-bottom:6px;">Tôi có thể giúp:</div>
+<ul style="margin-left:16px;margin-bottom:10px;font-size:12px;color:#94a3b8;line-height:1.8;">
+<li>✍️ Viết &amp; giải thích code với context đầy đủ</li>
+<li>🐛 Debug và fix lỗi trong file hiện tại</li>
+<li>⚡ Tối ưu hóa và refactor</li>
+<li>📚 Tạo documentation &amp; unit tests</li>
+<li>🏗️ Thiết kế kiến trúc &amp; best practices</li>
+</ul>
+<div style="font-size:11px;color:#4b5563;background:rgba(0,0,0,0.2);border-radius:6px;padding:8px;">
+  💡 <strong style="color:#6366f1;">Tip:</strong> Đặt API key Anthropic trong <span onclick="Settings.show()" style="color:#818cf8;cursor:pointer;text-decoration:underline;">Settings → AI Assistant</span> để dùng đầy đủ sức mạnh của Claude.
+</div>
+</div>
+</div>
+<div class="ai-typing hidden" id="ai-typing">
+<span></span><span></span><span></span>
+</div>
+<!-- Input Area -->
+<div class="ai-panel-input-area">
+  <div id="ai-no-key-warn" class="ai-panel-no-key-warn" style="display:none;">
+    <i class="fas fa-key"></i>
+    <span>Chưa có API key. <a onclick="Settings.show();setTimeout(()=>switchSettingsTab('ai',document.querySelector('[data-stab=ai]')),100)">Cấu hình ngay →</a></span>
+  </div>
+  <div class="ai-panel-textarea-wrap">
+    <textarea id="ai-input" rows="1" placeholder="Hỏi tôi về code... (Shift+Enter để xuống dòng)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();AI.send();}else if(event.key==='Escape'){AI.cancel();}" oninput="this.style.height='';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+    <button class="btn" id="ai-cancel-btn" onclick="AI.cancel()" title="Cancel (Esc)" style="display:none;background:#991b1b;color:#fca5a5;border:none;border-radius:6px;padding:0 10px;cursor:pointer;">
+      <i class="fas fa-stop"></i>
+    </button>
+    <button class="btn primary" id="ai-send-btn" onclick="AI.send()" title="Send (Enter)">
+      <i class="fas fa-paper-plane"></i>
+    </button>
+  </div>
+  <div class="ai-panel-footer">
+    <span class="ai-panel-hint"><i class="fas fa-info-circle"></i> Enter gửi · Shift+Enter xuống dòng</span>
+    <span class="ai-panel-hint" id="ai-status-text">Powered by Claude API</span>
+  </div>
+</div>
+</div>
+
+
+<!-- ══════════════════════════════���════════════════════════════════════════════
+     MEGAPATCH v20 - PRO CODE IDE ULTIMATE UPGRADE
+     Features: Real Anthropic AI · Zen Mode · Pomodoro Timer · TODO Tracker
+              Keyboard Shortcut Help · Markdown Preview · Code Stats
+              Color Themes · File Diff · Snippets Manager · Focus Mode
+              Breadcrumb Nav · Smart Indentation · Auto-Bracket Matching
+     All bugs fixed. All features supercharged. 100% unleashed.
+═══════════════════════════════════════════════════════════════════════════ -->
+
+<!-- ═══ v23 DYNAMIC ISLAND ═══ -->
+
+<!-- ═══ v23 POWER MODE CANVAS ═══ -->
+<canvas id="power-canvas"></canvas>
+
+<!-- ═══ v23 POWER METER ═══ -->
+<div class="power-meter" id="power-meter">
+  <span class="power-combo" id="power-combo">COMBO x0</span>
+  <span class="power-label">🔥 POWER</span>
+  <div class="power-bar-wrap">
+    <div class="power-bar-fill" id="power-bar-fill" style="width:0%"></div>
+  </div>
+</div>
+
+<!-- ═══ v23 ZEN AMBIENT ═══ -->
+<div id="zen-ambient"></div>
+<canvas id="zen-particles-canvas"></canvas>
+
+<!-- ═══ v23 GLOW CURSOR ═══ -->
+<!-- ═══ v23 NOTIFICATION STACK ═══ -->
+<div class="notif-stack" id="notif-stack"></div>
+
+<!-- ═══ v23 SHORTCUT CHEATSHEET ═══ -->
+
+<!-- ═══ v23 FILE RADAR ═══ -->
+
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     🔥 PRO CODE IDE v24.0 — GODMODE EDITION
+     ═══════════════════════════════════════════════════════════════════════════
+     ✅ EventBus Neural Architecture
+     ✅ WindowManager (Z-Index Wars FIXED)
+     ✅ Glassmorphism 3.0 + Noise Texture
+     ✅ Floating Context Menu (Notion-style)
+     ✅ Bento Box Welcome Dashboard  
+     ✅ NPM Auto-Typings (unpkg .d.ts injection)
+     ✅ AI Ghost Text Inline Completions (Copilot-style)
+     ✅ Architecture Canvas (Excalidraw)
+     ✅ SQLite WASM File Explorer
+     ✅ Heatmap Minimap (Error/Warn/TODO annotations)
+     ✅ MutationObserver (kills all setInterval DOM polling)
+     ✅ isomorphic-git UI (visual branch graph)
+     ✅ Cinematic Code Playback (Session Recording)
+     ✅ Pomodoro 2.0 + Daily Goals
+     ✅ Contribution Heat Calendar
+     ✅ Smart Diagnostics Panel upgrade
+     ✅ Noise Grain Overlay on all glass panels
+     ═══════════════════════════════════════════════════════════════════════════ -->
+
+<!-- ═══════════════════════════════════════════════════════
+     🆕 v25 NEW HTML ELEMENTS
+══════════════════════════════════════════════════════════ -->
+
+<!-- Voice Command Orb removed — accessed via Hamburger Menu (AI & Audio section) -->
+
+<!-- Time Machine Panel -->
+
+<!-- Multiplayer Bar removed (preview-only feature, no real backend) -->
+
+<!-- Local AI Panel -->
+
+<!-- HUD Metrics -->
+
+<!-- ████████████████████████████████████████████████████���███████████████
+     ██  ProCode IDE v30 — THE SINGULARITY PATCH (migrated from v28)   ██
+     ██  Full God-Tier upgrade: 3D Code City, Eye Tracking, Audio,    ██
+     ██  Multi-Agent AI, Y.js Multiplayer, Haptic, Native FS,         ██
+     ██  Promise Bootloader, Web Worker Architecture                   ██
+     ███████████████████████████���████████████████████████████████████████ -->
+
+<!-- Y.js removed: no UMD build on CDN. Multiplayer falls back to local simulation (see window.Y check at runtime). -->
+<!-- Three.js for 3D Code City — AMD-guarded to prevent Monaco loader conflict -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" crossorigin="anonymous"></script>
+<!-- WebGazer.js for eye tracking -->
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     V29 — THE OMEGA PATCH 🌀
+     Git Engine · AI Pair Programmer · REST Client · Test Runner · Profiler
+     JSON Explorer · Regex Lab · Database UI · Plugin API · Code Map
+═══════════════════════════════════════════════════════════════════════════ -->
+
+<!-- isomorphic-git + lightning-fs CDN — AMD-guarded -->
+<script>/* AMD guard: hide Monaco define */ (function(){var d=window.define; if(d&&d.amd){window.__amdDefineStash=d; window.define=undefined;}}());</script>
+<script src="https://cdn.jsdelivr.net/npm/isomorphic-git@1.25.6/index.umd.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@isomorphic-git/lightning-fs@4.6.0/dist/lightning-fs.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/isomorphic-git@1.25.6/http/web/index.umd.js" crossorigin="anonymous"></script>
+<script>/* AMD guard: restore define */ (function(){if(window.__amdDefineStash){window.define=window.__amdDefineStash; window.__amdDefineStash=undefined;}}());</script>
+
+
+<!-- Fuse.js fuzzy search — AMD-guarded -->
+<script>/* AMD guard: hide Monaco define */ (function(){var d=window.define; if(d&&d.amd){window.__amdDefineStash=d; window.define=undefined;}}());</script>
+<script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.min.js" crossorigin="anonymous"></script>
+<script>/* AMD guard: restore define */ (function(){if(window.__amdDefineStash){window.define=window.__amdDefineStash; window.__amdDefineStash=undefined;}}());</script>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     V30 — THE TRANSCENDENCE PATCH 🔥
+     Split Editor · AI Streaming · Theme Designer · TODO Manager ·
+     Code Metrics · Env Manager · Code Share · Pomodoro · Color Picker ·
+     Bookmarks · Templates · Zen Mode · Build System · Code Compare ·
+     Markdown Preview · Quick Actions · Live Stats · Bug Fixes
+═══════════════════════════════════════════════════════════════════════ -->
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     ProCode IDE v31 — ULTIMATE UPGRADE PATCH
+     New: Focus Mode · Quick File Nav · Code Stats · Multi-Theme · 
+          Keyboard Maestro · Line Diff Highlight · Smart Find · 
+          File Templates · Typing Velocity · Session Notes
+     ═══════════════════════════════════════════════════════════════════ -->
+
+<!-- ███████████████████████████████████████████████████████████████████████████
+     ██                                                                        ██
+     ██   ProCode IDE v32 — THE GENESIS                                       ██
+     ██                                                                        ██
+     ██   FEATURES:                                                            ██
+     ██   § 0  Security Shield (XSS Sanitizer + CSP)                          ██
+     ██   § 1  EventRegistry (AbortController leak fix)                       ██
+     ██   § 2  Portal System (Z-Index hell fix)                                ██
+     ██   § 3  Radial Context Menu (Blender-style wheel)                      ██
+     ██   § 4  Floating Orb Widgets (iOS widget system)                       ██
+     ██   § 5  Code Bubbles (Ctrl+Click floating snippets)                    ██
+     ██   § 6  Zen Canvas Mode (Figma-inspired full-screen)                   ██
+     ██   § 7  Local RAG / Semantic Search (IndexedDB + vectors)              ██
+     ██   § 8  Time-Travel Debugger (replay state machine)                    ██
+     ██   § 9  GPU Optimizer (battery-aware, will-change)                     ██
+     ██   §10  Promise Boot Refactor (no more setTimeout races)               ██
+     ██   §11  Bento Floating Panels (drag-free widgets)                      ██
+     ██   §12  Project Radar Map (2D codebase minimap)                        ██
+     ██   §13  Spatial Multiplayer Audio                                      ██
+     ██   §14  WebContainer Terminal (Node.js-in-browser sim)                 ██
+     ██   §15  Visual Diff & Smart Merge                                      ██
+     ██   §16  AI Inline Ghost Completion v2                                  ██
+     ██   §17  Performance HUD Pro                                            ██
+     ██   §18  Theme Engine v2 (live CSS var painter)                         ██
+     ██   §19  Command Bus (centralized event system)                         ██
+     ██   §20  Boot Orchestrator                                               ██
+     ████████████████████████████████████████████████████████████████████████████ -->
+
+
+
+<!-- V32 PORTAL CONTAINER -->
+
+<!-- V32 RAG PANEL -->
+<div id="v32-rag-panel">
+  <div id="v32-rag-header">
+    <i class="fas fa-brain" id="v32-rag-icon"></i>
+    <input id="v32-rag-input" placeholder="Ask anything about your codebase…" onkeydown="V32RAG.handleKey(event)"/>
+    <span id="v32-rag-badge">SEMANTIC RAG</span>
+  </div>
+  <div id="v32-rag-thinking">
+    <div class="v32-rag-dot"></div><div class="v32-rag-dot"></div><div class="v32-rag-dot"></div>
+    <span>Searching codebase vectors…</span>
+  </div>
+  <div id="v32-rag-results"></div>
+  <div id="v32-rag-footer">
+    <span><kbd style="background:#27272a;padding:1px 4px;border-radius:3px;font-size:8px">Enter</kbd> search</span>
+    <span><kbd style="background:#27272a;padding:1px 4px;border-radius:3px;font-size:8px">Esc</kbd> close</span>
+    <span style="margin-left:auto;color:#27272a" id="v32-rag-count">0 files indexed</span>
+  </div>
+</div>
+
+<!-- V32 ZEN CANVAS -->
+<div id="v32-zen-overlay">
+  <div id="v32-zen-canvas-particles"></div>
+  <div id="v32-zen-editor">
+    <div id="v32-zen-bar">
+      <div id="v32-zen-dots">
+        <span style="background:#ef4444" onclick="V32ZenCanvas.toggle()" title="Close"></span>
+        <span style="background:#f59e0b" onclick="V32ZenCanvas.minimize()" title="Minimize"></span>
+        <span style="background:#22c55e" title="Maximize"></span>
+      </div>
+      <span id="v32-zen-title">Zen Canvas Mode</span>
+      <button id="v32-zen-close" onclick="V32ZenCanvas.toggle()"><i class="fas fa-times"></i></button>
+    </div>
+    <div id="v32-zen-content">
+      <div id="v32-zen-monaco" style="width:100%;height:100%"></div>
+    </div>
+  </div>
+</div>
+
+
+<!-- V32 DIFF PANEL -->
+<div id="v32-diff-panel">
+  <div id="v32-diff-header">
+    <i class="fas fa-code-branch" style="color:#6366f1"></i>
+    <span id="v32-diff-title">Visual Diff</span>
+    <div style="display:flex;gap:8px;margin-left:auto">
+      <button style="background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.2);color:#818cf8;border-radius:6px;cursor:pointer;font-size:10px;padding:3px 10px" onclick="V32Diff.merge()">Merge →</button>
+      <button id="v32-diff-close" onclick="V32Diff.hide()"><i class="fas fa-times" style="font-size:14px;color:#52525b"></i></button>
+    </div>
+  </div>
+  <div id="v32-diff-body">
+    <div class="v32-diff-pane"><div class="v32-diff-pane-header">BEFORE</div><div id="v32-diff-before"></div></div>
+    <div class="v32-diff-pane"><div class="v32-diff-pane-header">AFTER</div><div id="v32-diff-after"></div></div>
+  </div>
+</div>
+
+<!-- V32 THEME PAINTER -->
+<div id="v32-theme-panel">
+  <div id="v32-theme-header">
+    <span><i class="fas fa-palette"></i> THEME PAINTER</span>
+    <button id="v32-theme-close" onclick="V32ThemePainter.toggle()"><i class="fas fa-times"></i></button>
+  </div>
+  <div class="v32-theme-row"><label>Primary</label><input type="color" id="v32-tc-primary" value="#6366f1" oninput="V32ThemePainter.apply('primary',this.value)"/></div>
+  <div class="v32-theme-row"><label>Accent</label><input type="color" id="v32-tc-accent" value="#a855f7" oninput="V32ThemePainter.apply('accent',this.value)"/></div>
+  <div class="v32-theme-row"><label>Background</label><input type="color" id="v32-tc-bg" value="#0b0f14" oninput="V32ThemePainter.apply('bg',this.value)"/></div>
+  <div class="v32-theme-row"><label>Surface</label><input type="color" id="v32-tc-surface" value="#18181b" oninput="V32ThemePainter.apply('surface',this.value)"/></div>
+  <div class="v32-theme-row"><label>Text</label><input type="color" id="v32-tc-text" value="#e4e4e7" oninput="V32ThemePainter.apply('text',this.value)"/></div>
+  <div class="v32-theme-preset">
+    <div class="v32-theme-chip active" style="background:linear-gradient(135deg,#6366f1,#a855f7)" title="Indigo" onclick="V32ThemePainter.preset('indigo')"></div>
+    <div class="v32-theme-chip" style="background:linear-gradient(135deg,#06b6d4,#3b82f6)" title="Ocean" onclick="V32ThemePainter.preset('ocean')"></div>
+    <div class="v32-theme-chip" style="background:linear-gradient(135deg,#22c55e,#10b981)" title="Forest" onclick="V32ThemePainter.preset('forest')"></div>
+    <div class="v32-theme-chip" style="background:linear-gradient(135deg,#f59e0b,#ef4444)" title="Sunset" onclick="V32ThemePainter.preset('sunset')"></div>
+    <div class="v32-theme-chip" style="background:linear-gradient(135deg,#e879f9,#ec4899)" title="Rose" onclick="V32ThemePainter.preset('rose')"></div>
+    <div class="v32-theme-chip" style="background:linear-gradient(135deg,#f8fafc,#94a3b8)" title="Arctic" onclick="V32ThemePainter.preset('arctic')"></div>
+  </div>
+</div>
+
+<!-- V32 SHORTCUT OVERLAY -->
+<div id="v32-shortcut-overlay">
+  <div id="v32-shortcut-grid">
+    <div style="grid-column:1/-1;font-size:13px;font-weight:700;color:#818cf8;padding:0 0 12px;border-bottom:1px solid rgba(99,102,241,0.15);margin-bottom:8px"><i class="fas fa-keyboard"></i> Keyboard Shortcuts — v32 Genesis</div>
+    <div class="v32-key-row"><span class="v32-key-action">Zen Canvas Mode</span><div class="v32-key-combo"><kbd class="v32-key">Alt</kbd><kbd class="v32-key">Z</kbd></div></div>
+    <div class="v32-key-row"><span class="v32-key-action">Semantic Search (RAG)</span><div class="v32-key-combo"><kbd class="v32-key">Alt</kbd><kbd class="v32-key">S</kbd></div></div>
+    <div class="v32-key-row"><span class="v32-key-action">Radar Map</span><div class="v32-key-combo"><kbd class="v32-key">Alt</kbd><kbd class="v32-key">M</kbd></div></div>
+    <div class="v32-key-row"><span class="v32-key-action">WebContainer Terminal</span><div class="v32-key-combo"><kbd class="v32-key">Alt</kbd><kbd class="v32-key">W</kbd></div></div>
+    <div class="v32-key-row"><span class="v32-key-action">Theme Painter</span><div class="v32-key-combo"><kbd class="v32-key">Alt</kbd><kbd class="v32-key">P</kbd></div></div>
+    <div class="v32-key-row"><span class="v32-key-action">Visual Diff</span><div class="v32-key-combo"><kbd class="v32-key">Alt</kbd><kbd class="v32-key">D</kbd></div></div>
+    <div class="v32-key-row"><span class="v32-key-action">Performance HUD</span><div class="v32-key-combo"><kbd class="v32-key">Alt</kbd><kbd class="v32-key">H</kbd></div></div>
+    <div class="v32-key-row"><span class="v32-key-action">Code Bubble (selection)</span><div class="v32-key-combo"><kbd class="v32-key">Alt</kbd><kbd class="v32-key">B</kbd></div></div>
+    <div class="v32-key-row"><span class="v32-key-action">Radial Menu</span><div class="v32-key-combo"><kbd class="v32-key">Right Click</kbd></div></div>
+    <div class="v32-key-row"><span class="v32-key-action">Close overlay</span><div class="v32-key-combo"><kbd class="v32-key">Esc</kbd></div></div>
+    <div style="grid-column:1/-1;margin-top:12px">
+      <button onclick="document.getElementById('v32-shortcut-overlay').classList.remove('active')" style="background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);color:#818cf8;border-radius:8px;padding:6px 20px;cursor:pointer;font-size:12px">Close</button>
+    </div>
+  </div>
+</div>
+
+
+
+<!-- ████████████████████████████████████████████████████████████████████████████
+     ██  ProCode IDE v33 — ULTIMATE EVOLUTION                                 ██
+     ██                                                                        ██
+     ██  §0   Blueprint Visual Scripting (Unreal Engine Node Editor)          ██
+     ██  §1   God-Tier Mini Browser + Built-in DevTools                       ██
+     ██  §2   Multiplayer Spatial Audio + Haptic Vibration                    ██
+     ██  §3   AI Contextual Inline Assist v3 (multi-file RAG)                 ██
+     ██  §4   Live CSS Variable Inspector (Visual token editor)               ██
+     ██  §5   Smooth Floating Panel System (iOS Widget)                       ██
+     ██  §6   Error Boundary & Crash Recovery                                 ██
+     ██  §7   Collaborative Cursor Sync (Y.js enhanced)                       ██
+     ██  §8   One-Click Deploy Simulator                                      ██
+     ██  §9   Smart Snippet Library (searchable + taggable)                   ██
+     ██  §10  Command Palette v2 (fuzzy + icons + preview)                   ██
+     ████████████████████████████████████████████████████████████████████████████ -->
+
+
+
+<!-- V33 BLUEPRINT CANVAS -->
+
+<!-- V33 DEVTOOLS (attaches to preview-wrap) -->
+<div id="v33-devtools">
+  <div id="v33-dt-resize"></div>
+  <div id="v33-dt-tabs">
+    <span class="v33-dt-tab active" onclick="V33DevTools.switchTab('console',this)">Console</span>
+    <span class="v33-dt-tab" onclick="V33DevTools.switchTab('network',this)">Network</span>
+    <span class="v33-dt-tab" onclick="V33DevTools.switchTab('elements',this)">Elements</span>
+    <span class="v33-dt-tab" onclick="V33DevTools.switchTab('storage',this)">Storage</span>
+    <div style="flex:1"></div>
+    <span style="font-size:9px;color:#3f3f46;padding:0 10px;display:flex;align-items:center" id="v33-dt-count">0 messages</span>
+    <button onclick="V33DevTools.clear()" style="background:none;border:none;color:#52525b;cursor:pointer;font-size:10px;padding:0 10px">CLEAR</button>
+    <button onclick="V33DevTools.toggle()" style="background:none;border:none;color:#52525b;cursor:pointer;font-size:14px;padding:0 12px 0 4px">×</button>
+  </div>
+  <div class="v33-dt-pane active" id="v33-dt-pane-console"><div id="v33-dt-console"></div></div>
+  <div class="v33-dt-pane" id="v33-dt-pane-network"><div id="v33-dt-network"></div></div>
+  <div class="v33-dt-pane" id="v33-dt-pane-elements"><div id="v33-dt-elements"></div></div>
+  <div class="v33-dt-pane" id="v33-dt-pane-storage"><div id="v33-dt-storage" style="padding:10px 14px;font-size:10px;font-family:'JetBrains Mono',monospace;color:#52525b"></div></div>
+</div>
+
+<!-- V33 SPATIAL AUDIO INDICATOR -->
+<div id="v33-audio-orb">
+  <div class="v33-audio-bar"></div><div class="v33-audio-bar"></div>
+  <div class="v33-audio-bar"></div><div class="v33-audio-bar"></div><div class="v33-audio-bar"></div>
+  <span id="v33-audio-label" style="font-size:10px;color:#6366f1;font-weight:700;margin-left:4px">Someone is typing…</span>
+</div>
+
+<!-- V33 CSS TOKEN INSPECTOR -->
+<div id="v33-token-inspector">
+  <div id="v33-ti-header">
+    <i class="fas fa-paint-brush" style="color:#6366f1"></i>
+    <span id="v33-ti-title">CSS Design Tokens</span>
+    <button id="v33-ti-close" onclick="document.getElementById('v33-token-inspector').classList.remove('active')"><i class="fas fa-times"></i></button>
+  </div>
+  <div id="v33-ti-grid"></div>
+</div>
+
+<!-- V33 DEPLOY PANEL -->
+
+<!-- V33 SNIPPET LIBRARY -->
+
+<!-- V33 COMMAND PALETTE V2 -->
+<div id="v33-cmd">
+  <div id="v33-cmd-wrap">
+    <i class="fas fa-terminal" id="v33-cmd-icon"></i>
+    <input id="v33-cmd-input" placeholder="Type a command, file, or action…" oninput="V33CommandPalette.filter(this.value)" onkeydown="V33CommandPalette.handleKey(event)" autocomplete="off"/>
+    <kbd style="font-size:9px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);padding:2px 7px;border-radius:5px;color:#3f3f46">ESC</kbd>
+  </div>
+  <div id="v33-cmd-list"></div>
+  <div id="v33-cmd-footer">
+    <span><kbd style="background:#27272a;padding:1px 4px;border-radius:3px">↑↓</kbd> navigate</span>
+    <span><kbd style="background:#27272a;padding:1px 4px;border-radius:3px">Enter</kbd> execute</span>
+    <span><kbd style="background:#27272a;padding:1px 4px;border-radius:3px">Tab</kbd> preview</span>
+    <span style="margin-left:auto" id="v33-cmd-count">0 results</span>
+  </div>
+</div>
+
+<!-- V33 CRASH SCREEN -->
+<div id="v33-crash-screen">
+  <div style="font-size:48px">💥</div>
+  <div id="v33-crash-title">ProCode Crashed</div>
+  <div id="v33-crash-msg">An unexpected error occurred. Your work has been auto-saved.</div>
+  <div id="v33-crash-stack"></div>
+  <div style="display:flex;gap:10px;margin-top:16px">
+    <button onclick="V33ErrorBoundary.recover()" style="background:linear-gradient(135deg,#6366f1,#a855f7);border:none;color:white;border-radius:10px;padding:10px 24px;cursor:pointer;font-size:13px;font-weight:700"><i class="fas fa-redo"></i> Recover</button>
+    <button onclick="location.reload()" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#a1a1aa;border-radius:10px;padding:10px 24px;cursor:pointer;font-size:13px">Hard Reload</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     ██████╗ ██████╗  ██████╗  ██████╗ ██████╗ ██████╗ ███████╗
+     ██╔══██╗██╔══██╗██╔═══██╗██╔════╝��█╔═══██╗██╔══██╗██╔════╝
+     ██████╔╝██████╔╝██║   ██║██║     ██║   ██║██║  ██║█████╗
+     ██╔═══╝ ██╔══██╗██║   ██║██║     ██║   ██║██║  ██║██╔══╝
+     ██║     ██║  ██║╚██████╔╝╚██████╗╚██████╔╝██████╔╝███████╗
+     ╚═╝     ╚═╝  ╚═╝ ╚═════╝  ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝
+     IDE ∞  —  OBSIDIAN STUDIO UI REDESIGN
+     ───────────────────────────────────────────────────────────
+     Inspired by:
+       Zed     → pill tabs · dense-but-breathable spacing · no chrome noise
+       Fleet   → compact sidebar · sharp type · colorful status bar
+       Nova    → language-colored file dots · organic sidebar feel
+       Sublime → extreme minimalism · zero redundant borders
+       Cursor  → integrated AI accent line · command palette glass
+       Warp    → floating block feel · modern terminal glass
+     ───────────────────────────────────────────────────────────
+     All original JS logic preserved. Pure CSS + thin JS layer.
+     ═══════════════════════════════════════════════════════════════════════ -->
+
+
+
+<!-- ── JS: File-type colored tab dots (Nova-inspired) ── -->
+
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     ProCode IDE — ULTIMATE ENHANCEMENT PATCH
+     Fixes: Bug #1 (drag-overlay tag), Duplicate ID warnings, aria roles
+     Adds:  AI Code Review · Smart Diff Viewer · Multi-cursor Stats ·
+            Regex Tester · Color Picker · JSON Formatter · Markdown Preview ·
+            Code Timer · Accessibility Checker · Performance Profiler ·
+            Enhanced Notifications · Breadcrumb Nav · Command History ·
+            Git Blame View · Emoji Picker · Hex Viewer · CSS Inspector
+═══════════════════════════════════════════════════════════════════════ -->
+
+
+<!-- ══════════════════════════════════════════════
+     NEW PANELS HTML
+══════════════════════════════════════════════ -->
+
+<!-- TOAST CONTAINER -->
+
+<!-- REGEX TESTER -->
+<div id="regex-tester-panel" role="dialog" aria-label="Regex Tester" aria-modal="true">
+  <div class="regex-header">
+    <h4><i class="fas fa-code" style="color:var(--primary)"></i> Regex Tester</h4>
+    <button class="btn icon small" onclick="RegexTester.hide()" aria-label="Close"><i class="fas fa-times"></i></button>
+  </div>
+  <div class="regex-row">
+    <span style="color:#71717a;font-size:12px;flex-shrink:0">/</span>
+    <input id="rt-pattern" class="regex-input" placeholder="Pattern..." oninput="RegexTester.update()" aria-label="Regex pattern"/>
+    <span style="color:#71717a;font-size:12px;flex-shrink:0">/</span>
+    <input id="rt-flags" class="regex-flags" placeholder="gim" value="gm" oninput="RegexTester.update()" aria-label="Regex flags"/>
+  </div>
+  <div id="rt-error" class="regex-error" style="display:none"></div>
+  <div>
+    <div style="font-size:10px;color:#52525b;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.08em">Test String</div>
+    <div id="rt-test" class="regex-test-area" contenteditable="true" role="textbox" 
+         aria-multiline="true" aria-label="Test string"
+         oninput="RegexTester.update()">Hello world! Test 123.</div>
+  </div>
+  <div class="regex-stats">
+    <span id="rt-stats" class="match-count">0 matches</span>
+    <span style="margin:0 8px;color:#3f3f46">·</span>
+    <span id="rt-groups">0 groups</span>
+  </div>
+  <div id="rt-matches" style="max-height:120px;overflow-y:auto;font-size:11px;font-family:'JetBrains Mono',monospace;color:#a1a1aa"></div>
+</div>
+
+<!-- COLOR PICKER -->
+<div id="color-picker-panel" role="dialog" aria-label="Color Picker" aria-modal="true">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <span style="font-size:12px;font-weight:700;color:var(--primary)">🎨 Color Picker</span>
+    <button class="btn icon small" onclick="ColorPicker.hide()" aria-label="Close"><i class="fas fa-times"></i></button>
+  </div>
+  <div id="cp-preview" class="cp-preview" style="background:#6366f1"></div>
+  <input type="color" id="cp-native" value="#6366f1" oninput="ColorPicker.fromNative(this.value)" 
+         style="width:100%;height:36px;border-radius:8px;border:1px solid #3f3f46;cursor:pointer;background:#27272a"
+         aria-label="Color picker"/>
+  <div class="cp-row">
+    <span class="cp-label">HEX</span>
+    <input id="cp-hex" class="cp-value" value="#6366f1" oninput="ColorPicker.fromHex(this.value)" aria-label="Hex color value"/>
+    <button class="cp-copy-btn" onclick="ColorPicker.copy('hex')" title="Copy HEX" aria-label="Copy hex value">
+      <i class="fas fa-copy"></i>
+    </button>
+  </div>
+  <div class="cp-row">
+    <span class="cp-label">RGB</span>
+    <input id="cp-rgb" class="cp-value" value="99, 102, 241" readonly aria-label="RGB color value"/>
+    <button class="cp-copy-btn" onclick="ColorPicker.copy('rgb')" title="Copy RGB" aria-label="Copy RGB value">
+      <i class="fas fa-copy"></i>
+    </button>
+  </div>
+  <div class="cp-row">
+    <span class="cp-label">HSL</span>
+    <input id="cp-hsl" class="cp-value" value="239°, 84%, 67%" readonly aria-label="HSL color value"/>
+    <button class="cp-copy-btn" onclick="ColorPicker.copy('hsl')" title="Copy HSL" aria-label="Copy HSL value">
+      <i class="fas fa-copy"></i>
+    </button>
+  </div>
+  <div>
+    <div style="font-size:9px;color:#52525b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px">Palette</div>
+    <div class="cp-swatches" id="cp-swatches"></div>
+  </div>
+</div>
+
+<!-- JSON FORMATTER -->
+<div id="json-formatter-panel" role="dialog" aria-label="JSON Formatter" aria-modal="true">
+  <div class="json-panel-header">
+    <h4 style="font-size:14px;font-weight:700;color:white;display:flex;align-items:center;gap:8px">
+      <i class="fas fa-brackets-curly" style="color:var(--primary)"></i> JSON Formatter / Validator
+    </h4>
+    <div style="display:flex;gap:8px">
+      <button class="btn small" onclick="JsonFormatter.format()" aria-label="Format JSON">Format</button>
+      <button class="btn small" onclick="JsonFormatter.minify()" aria-label="Minify JSON">Minify</button>
+      <button class="btn small" onclick="JsonFormatter.clear()" aria-label="Clear JSON">Clear</button>
+      <button class="btn icon small" onclick="JsonFormatter.hide()" aria-label="Close"><i class="fas fa-times"></i></button>
+    </div>
+  </div>
+  <div class="json-panel-body">
+    <div class="json-col">
+      <div class="json-col-header">
+        <span>Input</span>
+        <button class="btn small" style="height:20px;font-size:10px" onclick="JsonFormatter.fromEditor()" aria-label="Import from editor">From Editor</button>
+      </div>
+      <textarea id="jf-input" class="json-textarea" placeholder='{"paste": "your JSON here"}' 
+                oninput="JsonFormatter.live()" aria-label="JSON input"></textarea>
+    </div>
+    <div class="json-col">
+      <div class="json-col-header">
+        <span>Output</span>
+        <button class="btn small" style="height:20px;font-size:10px" onclick="JsonFormatter.copyOutput()" aria-label="Copy output">Copy</button>
+      </div>
+      <div id="jf-output" class="json-output" aria-label="Formatted JSON output" aria-live="polite"></div>
+    </div>
+  </div>
+  <div style="padding:8px 16px;font-size:11px;background:#0d0d0f;border-top:1px solid #27272a;display:flex;gap:16px">
+    <span id="jf-status" style="color:#71717a" aria-live="polite">Ready</span>
+    <span id="jf-size" style="color:#52525b"></span>
+  </div>
+</div>
+
+<!-- CODE TIMER WIDGET -->
+<div id="code-timer-widget" role="timer" aria-label="Code Timer">
+  <div class="ct-title">⏱ Session Timer</div>
+  <div class="ct-time" id="ct-display" aria-live="off">00:00:00</div>
+  <div class="ct-session-info" id="ct-info">Lines: 0 · Keystrokes: 0</div>
+  <div class="ct-btns">
+    <button class="ct-btn" id="ct-toggle-btn" onclick="CodeTimer.toggle()" aria-label="Start/Stop timer">Start</button>
+    <button class="ct-btn" onclick="CodeTimer.reset()" aria-label="Reset timer">Reset</button>
+  </div>
+</div>
+
+<!-- ACCESSIBILITY CHECKER -->
+<div id="a11y-panel" role="dialog" aria-label="Accessibility Checker" aria-modal="true">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <span style="font-size:12px;font-weight:700;color:var(--primary)">♿ Accessibility Checker</span>
+    <button class="btn icon small" onclick="A11yChecker.hide()" aria-label="Close"><i class="fas fa-times"></i></button>
+  </div>
+  <button class="btn" onclick="A11yChecker.scan()" style="font-size:12px" aria-label="Scan for accessibility issues">
+    <i class="fas fa-search"></i> Scan Code
+  </button>
+  <div id="a11y-results" aria-live="polite" aria-label="Accessibility check results">
+    <div style="text-align:center;color:#52525b;font-size:12px;padding:20px">
+      Click "Scan Code" to check accessibility
+    </div>
+  </div>
+</div>
+
+<!-- COMMAND HISTORY -->
+<div id="cmd-history-panel" role="dialog" aria-label="Command History" aria-modal="true">
+  <div class="ch-header">
+    <h4 style="font-size:14px;font-weight:700;color:white">
+      <i class="fas fa-history" style="color:var(--primary);margin-right:8px"></i>Command History
+    </h4>
+    <div style="display:flex;gap:8px">
+      <button class="btn small" onclick="CmdHistory.clear()" aria-label="Clear history">Clear</button>
+      <button class="btn icon small" onclick="CmdHistory.hide()" aria-label="Close"><i class="fas fa-times"></i></button>
+    </div>
+  </div>
+  <div class="ch-list" id="ch-list" role="list" aria-label="Command history list"></div>
+</div>
+
+<!-- AI CODE REVIEW -->
+<div id="ai-review-panel" role="complementary" aria-label="AI Code Review">
+  <div class="ar-header">
+    <h4><i class="fas fa-robot" style="color:var(--primary)"></i> AI Code Review</h4>
+    <div style="display:flex;gap:6px">
+      <button class="btn small" onclick="AIReview.analyze()" aria-label="Analyze code">Analyze</button>
+      <button class="btn icon small" onclick="AIReview.hide()" aria-label="Close panel"><i class="fas fa-times"></i></button>
+    </div>
+  </div>
+  <div class="ar-body" id="ar-body">
+    <div style="text-align:center;color:#52525b;font-size:12px;padding:40px 20px">
+      <i class="fas fa-robot" style="font-size:32px;margin-bottom:12px;display:block;color:#27272a"></i>
+      Click "Analyze" to get AI-powered code review<br>
+      <span style="font-size:10px">Requires AI API key in Settings</span>
+    </div>
+  </div>
+</div>
+
+<!-- PERFORMANCE PROFILER -->
+<div id="perf-profiler-panel" role="dialog" aria-label="Performance Profiler" aria-modal="true">
+  <div class="pp-header">
+    <h4 style="font-size:14px;font-weight:700;color:white;display:flex;align-items:center;gap:8px">
+      <i class="fas fa-tachometer-alt" style="color:var(--primary)"></i> Performance Profiler
+    </h4>
+    <div style="display:flex;gap:8px">
+      <button class="btn small" id="pp-start-btn" onclick="PerfProfiler.toggle()" aria-label="Start profiling">Start</button>
+      <button class="btn icon small" onclick="PerfProfiler.hide()" aria-label="Close"><i class="fas fa-times"></i></button>
+    </div>
+  </div>
+  <div class="pp-body">
+    <div class="pp-chart">
+      <canvas id="pp-chart-canvas" aria-label="Performance chart"></canvas>
+    </div>
+    <div id="pp-metrics"></div>
+  </div>
+</div>
+
+<!-- JSON FORMATTER: brackets-curly icon fallback -->
+
+
+<!-- WORD COUNT BAR -->
+<div id="word-count-bar" role="status" aria-label="Document statistics" aria-live="polite">
+  <span class="wc-stat">Words: <span id="wc-words">0</span></span>
+  <span style="color:#3f3f46">·</span>
+  <span class="wc-stat">Chars: <span id="wc-chars">0</span></span>
+  <span style="color:#3f3f46">·</span>
+  <span class="wc-stat">Lines: <span id="wc-lines">0</span></span>
+  <span style="color:#3f3f46">·</span>
+  <span class="wc-stat">Selection: <span id="wc-sel">0</span></span>
+  <button class="btn icon small" onclick="document.getElementById('word-count-bar').classList.remove('visible')"
+          style="margin-left:8px" aria-label="Close word count bar">
+    <i class="fas fa-times"></i>
+  </button>
+</div>
+
+<!-- MARKDOWN PREVIEW PANEL -->
+<div id="md-preview-panel" role="dialog" aria-label="Markdown Preview" aria-modal="true">
+  <div class="md-panel-header">
+    <h4 style="font-size:14px;font-weight:700;color:white;display:flex;align-items:center;gap:8px">
+      <i class="fab fa-markdown" style="color:var(--primary)"></i> Markdown Preview
+    </h4>
+    <div style="display:flex;gap:8px">
+      <button class="btn small" onclick="MdPreview.fromEditor()" aria-label="Load from editor">From Editor</button>
+      <button class="btn icon small" onclick="MdPreview.hide()" aria-label="Close"><i class="fas fa-times"></i></button>
+    </div>
+  </div>
+  <div id="md-preview-body" class="md-body">
+    <div style="text-align:center;color:#52525b;font-size:13px;padding:40px">
+      <i class="fab fa-markdown" style="font-size:40px;display:block;margin-bottom:12px;color:#27272a"></i>
+      Open a .md file or paste markdown above
+    </div>
+  </div>
+</div>
+
+<!-- FOCUS INDICATOR -->
+<div class="focus-indicator" id="focus-indicator" role="status" aria-live="polite">
+  <i class="fas fa-eye"></i> Focus Mode
+</div>
+
+<!-- GIT BLAME PANEL -->
+<div id="git-blame-panel" role="complementary" aria-label="Git Blame">
+  <div class="gb-header">
+    <span style="font-size:12px;font-weight:700;color:white">
+      <i class="fas fa-code-branch" style="color:var(--primary);margin-right:6px"></i>Git Blame
+    </span>
+    <button class="btn icon small" onclick="GitBlame.hide()" aria-label="Close"><i class="fas fa-times"></i></button>
+  </div>
+  <div class="gb-list" id="gb-list" role="list" aria-label="Git blame entries"></div>
+</div>
+
+<!-- HEX VIEWER -->
+<div id="hex-viewer-panel" role="dialog" aria-label="Hex Viewer" aria-modal="true">
+  <div class="hv-header">
+    <h4 style="font-size:14px;font-weight:700;color:white;display:flex;align-items:center;gap:8px">
+      <i class="fas fa-th" style="color:var(--primary)"></i> Hex Viewer
+    </h4>
+    <div style="display:flex;gap:8px">
+      <button class="btn small" onclick="HexViewer.fromEditor()" aria-label="Load from editor">From Editor</button>
+      <button class="btn icon small" onclick="HexViewer.hide()" aria-label="Close"><i class="fas fa-times"></i></button>
+    </div>
+  </div>
+  <div class="hv-body" id="hv-body" aria-label="Hex view content"></div>
+</div>
+
+<!-- EMOJI PICKER -->
+<div id="emoji-picker-panel" role="dialog" aria-label="Emoji Picker" aria-modal="true">
+  <div style="padding:12px 16px;border-bottom:1px solid #27272a;display:flex;justify-content:space-between;align-items:center">
+    <span style="font-size:12px;font-weight:700;color:white">😀 Emoji Picker</span>
+    <button class="btn icon small" onclick="EmojiPicker.hide()" aria-label="Close"><i class="fas fa-times"></i></button>
+  </div>
+  <div class="ep-search">
+    <input type="search" id="ep-search" placeholder="Search emoji..." oninput="EmojiPicker.search(this.value)"
+           aria-label="Search emoji"/>
+  </div>
+  <div class="ep-grid" id="ep-grid" role="grid" aria-label="Emoji grid"></div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     ENHANCEMENT JAVASCRIPT MODULES
+══════════════════════════════════════════════ -->
+
+
+
+<!-- ═══════════════════════════════════════════════════════
+     ACTIVITY BAR ULTIMATE UPGRADE
+     Complete rebuild: animations, tooltips, badges, groups,
+     drag-reorder, mini-labels, contextmenu, glow FX
+═══════════════════════════════════════════════════════ -->
+
+
+<!-- RICH TOOLTIP ELEMENT (singleton, moved by JS) -->
+<div id="act-tooltip" class="act-tooltip" role="tooltip">
+  <div class="act-tooltip-name" id="act-tt-name">Explorer</div>
+  <div class="act-tooltip-desc" id="act-tt-desc"></div>
+  <div class="act-tooltip-kbd" id="act-tt-kbd"></div>
+</div>
+
+<!-- CONTEXT MENU -->
+<div id="act-ctx-menu" role="menu" aria-label="Activity bar context menu">
+  <div class="act-ctx-item" data-action="toggle-labels" role="menuitem">
+    <i class="fas fa-tags"></i> Toggle Labels
+  </div>
+  <div class="act-ctx-item" data-action="move-top" role="menuitem">
+    <i class="fas fa-arrow-up"></i> Move to Top
+  </div>
+  <div class="act-ctx-item" data-action="move-bottom" role="menuitem">
+    <i class="fas fa-arrow-down"></i> Move to Bottom
+  </div>
+  <div class="act-ctx-sep"></div>
+  <div class="act-ctx-item" data-action="pin" role="menuitem">
+    <i class="fas fa-thumbtack"></i> Pin / Unpin
+  </div>
+  <div class="act-ctx-item" data-action="hide" role="menuitem">
+    <i class="fas fa-eye-slash"></i> Hide Button
+  </div>
+  <div class="act-ctx-sep"></div>
+  <div class="act-ctx-item" data-action="reset" role="menuitem">
+    <i class="fas fa-undo"></i> Reset Layout
+  </div>
+</div>
+
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     v31 UI UPGRADE LAYER — Modern visual polish + global error safety net
+     Added at end-of-body so it cascades over ALL prior styles.
+     Touches ONLY visual properties (no layout breaking, no JS hooks changed).
+     ═══════════════════════════════════════════════════════════════════════ -->
+
+<!-- ═══════════════════════════════════════════��═══════════════════════════
+     v32 FILE-TREE CONTEXT MENU UPGRADE
+     - Hijacks right-click on .t-item[data-path] (files) and .t-item[data-folder]
+       (folders) at the CAPTURE phase, before legacy oncontextmenu fires.
+     - Uses the existing window.UltraContextMenu (UCM) engine for a polished
+       look, smart edge-flip positioning, keyboard nav, and search filter.
+     - Provides a richer action set: Copy Path, Copy Relative Path, Reveal,
+       Open in Split, Cut/Copy/Paste, Compress, etc.
+     ══���═══════════════════════════���════════════════════���═════════════���═════ -->
+
+<!-- ═════════════════════════════════════════════════���═════════════════════
+     v33 SEARCH + CONSOLE + MULTI-LANGUAGE RUNNER UPGRADE
+     - Modernizes Search panel (regex, include/exclude globs, history,
+       debounce, collapsible file groups, keyboard nav).
+     - Modernizes Console panel (level filter chips, live filter input,
+       timestamps, autoscroll toggle, copy-all, expandable JSON, virtual cap).
+     - Adds REAL in-browser execution for: TypeScript / TSX / JSX (Babel),
+       Lua (Fengari), SQL (sql.js / SQLite WASM), YAML / TOML / CSV viewers,
+       and a richer JS runner that streams output to Console.
+     ═══════════════════════════════════════════════════════════════════════ -->
+
+</body>
+</html>
+<!-- ═══════════════════════════════════════════════════
+     PREVIEW DEVICE SYSTEM + UI FIXES PATCH
+═══════════════════════════════════════════════════ -->
+
+<!-- ═══════════════════════════════════════════════
+     LAYOUT FIX + FIND BAR (Ctrl+F / Sublime style)
+═══════════════════════════════════════════════ -->
+
+
+<!-- FIND BAR HTML -->
+<div id="find-bar" role="dialog" aria-label="Find in file">
+  <!-- Row 1: Find -->
+  <div class="fb-row">
+    <i class="fas fa-search" style="color:#52525b;font-size:11px;flex-shrink:0;"></i>
+    <input class="fb-input" id="fb-find-input" placeholder="Find…" autocomplete="off" spellcheck="false"/>
+    <!-- Options: Aa / \b / .* -->
+    <div class="fb-opts">
+      <button class="fb-opt" id="fb-opt-case" title="Match Case (Alt+C)">Aa</button>
+      <button class="fb-opt" id="fb-opt-word" title="Whole Word (Alt+W)">\b</button>
+      <button class="fb-opt" id="fb-opt-regex" title="Use Regex (Alt+R)">.*</button>
+    </div>
+    <div class="fb-sep"></div>
+    <!-- Counter -->
+    <span class="fb-counter" id="fb-counter">—</span>
+    <!-- Nav -->
+    <button class="fb-btn" id="fb-prev-btn" title="Previous match (Shift+Enter / Shift+F3)"><i class="fas fa-chevron-up"></i></button>
+    <button class="fb-btn" id="fb-next-btn" title="Next match (Enter / F3)"><i class="fas fa-chevron-down"></i></button>
+    <!-- Toggle replace -->
+    <button class="fb-btn" id="fb-replace-toggle" title="Toggle Replace"><i class="fas fa-exchange-alt"></i></button>
+    <!-- Close -->
+    <button class="fb-btn danger" id="fb-close-btn" title="Close (Escape)"><i class="fas fa-times"></i></button>
+  </div>
+  <!-- Row 2: Replace (hidden by default) -->
+  <div class="fb-row fb-replace-row" id="fb-replace-row" style="display:none;">
+    <i class="fas fa-pen" style="color:#52525b;font-size:11px;flex-shrink:0;"></i>
+    <input class="fb-input" id="fb-replace-input" placeholder="Replace with…" autocomplete="off" spellcheck="false"/>
+    <button class="fb-btn" id="fb-replace-one" title="Replace (Ctrl+H)"><i class="fas fa-reply"></i></button>
+    <button class="fb-btn" id="fb-replace-all" title="Replace All"><i class="fas fa-reply-all"></i></button>
+    <button class="fb-btn" title="Select all matches"><i class="fas fa-object-group"></i></button>
+  </div>
+</div>
+
+<!-- ══════════���════════════════════════════════════════════════
+     PERFORMANCE MEGA-PATCH
+     - Dedup breadcrumb bars (CSS kill)
+     - requestIdleCallback for non-critical work
+     - Debounce / throttle expensive listeners
+     - CSS containment + will-change hints
+     - Passive event listeners
+     - Virtual scroll for large file trees
+     - Stats bar throttle (250ms)
+     - Monaco lazy decorations
+     - Memory: cleanup on tab close
+     - requestAnimationFrame batching for UI updates
+═══════════════════════════════════════════════════════════ -->
+
+<!-- ══════════���═══════════════════════════════���════════════
+     HAMBURGER MENU + TERMINAL — FULL UI UPGRADE
+═══════════════════════════════════════════════════════ -->
+
+<!-- ═══════════��═══════════════════════════════════════════════
+     LANGUAGE EXPANSION PATCH — 80+ Languages
+     Adds: runSandbox, runShell, runSQL, runJSON, runMarkdown,
+           runNode, terminal commands for all new languages
+════════��══════════════════════════════════════════════════ -->
+
+
+<!-- ╔═══════════════════════════════════════════════════���══════════════╗
+     ║  PROCODE IDE — MEGA UI + PERFORMANCE UPGRADE                   ║
+     ║  Fonts · Colors · Header · Sidebar · Tabs · Terminal · Perf    ║
+     ╚══════════════════════════════════════���═══════════════════════════╝ -->
+
+<!-- ╔═══════════════════════════════════════════════════════════════╗
+     ║  TERMINAL UPGRADE v9 + LANGUAGE RUNTIME FIX                 ║
+     ║  - New xterm theme  · Upgraded welcome  · Better prompt     ║
+     ║  - Python (Pyodide) full fix  · JS/TS sandbox runner        ║
+     ║  - All language path resolution fix  · 30+ new commands     ║
+     ╚══════════════════════════════════���════════════════════════��═══╝ -->
+
+<!-- ════════════════════��══════════════════════════════════
+     TERMINAL BUG FIX v10 — Input, Paste, UI
+═══════════��═══════════════════════════════════════════ -->
+
+<!-- ╔══════════════════════════════════════════════════════════════════════╗
+     ║  TERMINAL MEGA UPGRADE v11                                         ║
+     ║  · Unified language engine  · 12 in-browser runtimes              ║
+     ║  · Lua (Fengari)  · SQL (sql.js)  · PHP (Uniter)                  ║
+     ║  · Better output formatting  · Proper ANSI colours                ║
+     ╚══════════════════════════════════════════════════════════════════════╝ -->
+
+<!-- Fengari — Lua 5.3 in browser — AMD-guarded -->
+<script>/* AMD guard: hide Monaco define */ (function(){var d=window.define; if(d&&d.amd){window.__amdDefineStash=d; window.define=undefined;}}());</script>
+<script src="https://cdn.jsdelivr.net/npm/fengari-web@0.1.4/dist/fengari-web.min.js"></script>
+<script>/* AMD guard: restore define */ (function(){if(window.__amdDefineStash){window.define=window.__amdDefineStash; window.__amdDefineStash=undefined;}}());</script>
+
+<!-- sql.js — SQLite in WASM — AMD-guarded -->
+<script>/* AMD guard: hide Monaco define */ (function(){var d=window.define; if(d&&d.amd){window.__amdDefineStash=d; window.define=undefined;}}());</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.js"></script>
+<script>/* AMD guard: restore define */ (function(){if(window.__amdDefineStash){window.define=window.__amdDefineStash; window.__amdDefineStash=undefined;}}());</script>
+
+
+<!-- ╔══════════════════════════════════════════════════════════════════════╗
+     ║  COMPILED LANGUAGE RUNNER v12                                      ║
+     ║  C · C++ · C# · Java · Rust  →  thực thi thật qua Piston API      ║
+     ║  Fallback: Judge0 CE → Wandbox                                     ║
+     ╚══════════════════════════════════════════════════════════════════════╝ -->
+
+
+<!-- ════════════════════════════════════════════════════════════
+     PISTON RUNNER UI v12.1 — Stdin panel + status indicator
+═════════════���════════════════════════════════════════════��═ -->
+
+<!-- ╔══════════════════════════════════════════════════════════════════════╗
+     ║  MASTER FIX v13 — SINGLE SOURCE OF TRUTH                          ║
+     ║  Clears ALL previous overlapping patches & rewrites cleanly        ║
+     ║  • Terminal: one setupInput, no duplicate handlers                 ║
+     ║  • Monaco: single ResizeObserver, clean layout                     ║
+     ║  • Performance: unified CSS, no conflicting will-change            ║
+     ╚═════════��════════════════════════════════════════════════════════════╝ -->
+
+<!-- ╔══════════════════════════════════════════════════════════════════╗
+     ║  PERFORMANCE MEGA UPGRADE v14                                  ║
+     ║  • Virtual DOM batching  • Worker offload                      ║
+     ║  • Smart debounce/throttle  • Memory pool                      ║
+     ║  • CSS paint isolation  • Frame budget scheduler               ║
+     ║  • Dead code elimination  • Event delegation                   ║
+     ╚══════════════════════════════════════════════════════════════════╝ -->
+
+<!-- ══════════════════════════════════════════════════════��════════════════════
+     PROCODE v30 — CRITICAL BUG FIX PATCH
+     Fixes: XSS sanitization · API key security · processQuery loop ·
+            Settings patch chain · stream abort · insert-to-editor guard ·
+            exportChat HTML strip · path traversal · Quick Actions auto-send ·
+            model indicator sync · CSS !important consolidation ·
+            AnthropicAI race condition · DOM thrashing throttle ·
+            7 stale intervals · memory leak guard
+═══════════════════════════════════════════════════════════════════════════ -->
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     PROCODE v32 — MAX EDITION FINALIZATION PATCH
+     · Piston: 50+ languages, retry-on-visibility, exponential backoff, runtime
+                cache for fast supported-list lookups
+     · Lazy: prettier loaded eagerly on first format keystroke (Ctrl/Cmd+Shift+F)
+     · Monaco: register "real" Monaco language IDs for new extensions so the
+                editor highlights .nim .cr .zig .v .raku .clj … without hand-rolled
+                Monarch grammars (uses closest-match aliases)
+     · Terminal: new `langs` / `runtimes` / `piston` commands; pretty status banner
+     · Console: forwards uncaught syntax errors with absolute file:line so users can
+                see WHICH external script failed (not the misleading procode.html:N:1)
+═══════════════════════════════════════���═══════════════════════════════════ -->
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     PROCODE v33 — INTERACTION & COLLABORATION PATCH
+     · UltraContextMenu  : polished right-click with smart-flip positioning,
+                            keyboard nav, search, submenu support, mobile long-
+                            press emulation, haptic feedback
+     · MirrorPreview     : preview running web pages on PC, phone, or any
+                            second screen via popup window + BroadcastChannel
+                            sync, touch-input emulation, QR-code data-share
+     · MultiplayerNG     : real working multiplayer using BroadcastChannel
+                            (same-browser tabs) and WebRTC DataChannel
+                            (cross-device, manual SDP signaling — no server
+                            needed). Live cursors, presence, chat.
+═══════════════════════════════════════════════════════════════════════════ -->
+
+
+<!-- v33 bootstrap: removed truncated inline duplicate; functionality lives in js/features/init-v33.js -->
+
+  
+
+  <!-- ── APPLICATION MODULES (load order: core → modules → features) ── -->
+
+  <!-- Core IDE modules -->
+  <script src="js/modules/core-ide-state.js"></script>
+  <script src="js/modules/utils.js"></script>
+  <script src="js/modules/filesystem-extra.js"></script>
+  <script src="js/modules/editor-manager.js"></script>
+  <script src="js/modules/tab-manager.js"></script>
+  <script src="js/modules/terminal-manager.js"></script>
+  <script src="js/modules/console-manager.js"></script>
+  <script src="js/modules/runner.js"></script>
+  <script src="js/modules/debugger.js"></script>
+  <script src="js/modules/panel-manager.js"></script>
+  <script src="js/modules/ai-manager.js"></script>
+  <script src="js/modules/project-templates.js"></script>
+  <script src="js/modules/git-manager.js"></script>
+  <script src="js/modules/search-manager.js"></script>
+  <script src="js/modules/layout-manager.js"></script>
+  <script src="js/modules/settings-manager.js"></script>
+  <script src="js/modules/workspace-io.js"></script>
+  <script src="js/modules/session-manager.js"></script>
+  <script src="js/modules/command-palette.js"></script>
+  <script src="js/modules/tutorial-manager.js"></script>
+  <script src="js/modules/notifications.js"></script>
+  <script src="js/modules/init-and-patches.js"></script>
+
+  <!-- Feature enhancements (applied after core is ready) -->
+  <script src="js/features/idb-reliability.js"></script>
+  <script src="js/features/hud-ui-v24.js"></script>
+  <script src="js/features/hologram-hud.js"></script>
+  <script src="js/features/patches-v26-v27.js"></script>
+  <script src="js/features/scope-system.js"></script>
+  <script src="js/features/git-ui.js"></script>
+  <script src="js/features/ai-review.js"></script>
+  <script src="js/features/toast-v29.js"></script>
+  <script src="js/features/genesis-ui.js"></script>
+  <script src="js/features/console-patch.js"></script>
+  <script src="js/features/tools-panel.js"></script>
+  <script src="js/features/find-bar.js"></script>
+
+  <!-- Late-loading CDN features (3D, Git, Lua/SQL) -->
+  <!-- AMD Guard: hide Monaco's define() so UMD libs don't conflict -->
+  <script>if(window.__amdGuard)window.__amdGuard.hide();else if(window.define&&window.define.amd){window.__monacoDefineBackup=window.define;window.define=undefined;}</script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" crossorigin="anonymous"></script>
+  <script>if(window.__amdGuard)window.__amdGuard.restore();else if(window.__monacoDefineBackup){window.define=window.__monacoDefineBackup;window.__monacoDefineBackup=null;}</script>
+  <script src="js/features/three-3d-view.js"></script>
+
+  <script>if(window.__amdGuard)window.__amdGuard.hide();else if(window.define&&window.define.amd){window.__monacoDefineBackup=window.define;window.define=undefined;}</script>
+  <script src="https://cdn.jsdelivr.net/npm/isomorphic-git@1.25.6/index.umd.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@isomorphic-git/lightning-fs@4.6.0/dist/lightning-fs.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/isomorphic-git@1.25.6/http/web/index.umd.js" crossorigin="anonymous"></script>
+  <script>if(window.__amdGuard)window.__amdGuard.restore();else if(window.__monacoDefineBackup){window.define=window.__monacoDefineBackup;window.__monacoDefineBackup=null;}</script>
+
+  <script>if(window.__amdGuard)window.__amdGuard.hide();else if(window.define&&window.define.amd){window.__monacoDefineBackup=window.define;window.define=undefined;}</script>
+  <script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.min.js" crossorigin="anonymous"></script>
+  <script>if(window.__amdGuard)window.__amdGuard.restore();else if(window.__monacoDefineBackup){window.define=window.__monacoDefineBackup;window.__monacoDefineBackup=null;}</script>
+
+  <script>if(window.__amdGuard)window.__amdGuard.hide();else if(window.define&&window.define.amd){window.__monacoDefineBackup=window.define;window.define=undefined;}</script>
+  <script src="https://cdn.jsdelivr.net/npm/fengari-web@0.1.4/dist/fengari-web.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.js" defer></script>
+  <script>if(window.__amdGuard)window.__amdGuard.restore();else if(window.__monacoDefineBackup){window.define=window.__monacoDefineBackup;window.__monacoDefineBackup=null;}</script>
+
+  <script src="js/features/runner-extensions.js"></script>
+  <script src="js/features/terminal-ui-upgrade.js"></script>
+  <script src="js/features/performance.js"></script>
+  <script src="js/features/master-fix.js"></script>
+  <script src="js/features/patches-v33.js"></script>
+  <script src="js/features/init-v33.js"></script>
+  <script src="js/features/activity-bar-ultimate.js"></script>
+  <script src="js/features/v34-enhancements.js"></script>
+
+</body>
+</html>
