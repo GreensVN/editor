@@ -27,7 +27,7 @@ const PistonAPI = (function() {
   ──────────────────────────────────────────────────────────────── */
   const DEFAULT_ENDPOINTS = [
     'https://piston-production-d148.up.railway.app/api/v2/execute',
-    'https://piston-production-ccb3.up.railway.app/api/v2/piston/execute',
+    'https://piston-production-d148.up.railway.app/api/v2/piston/execute',
   ];
   // CORS proxies used as auto-fallback when a direct request fails with
   // a CORS / network error (browser cannot read the response).  Each entry
@@ -294,9 +294,12 @@ const PistonAPI = (function() {
   }
 
   // FIX-PISTON-UI: expose _activeEndpoint so Settings UI and terminal `piston status` can read/reset it
+  // FIX-SCOPE (v3.1.5): expose _useProxy so terminal patches outside this IIFE can call it
+  //   without causing ReferenceError.  The underlying localStorage read is the same function.
   return { execute, isSupported, LANG_CONFIG, ENDPOINT,
     get _activeEndpoint() { return _activeEndpoint; },
-    set _activeEndpoint(v) { _activeEndpoint = v; }
+    set _activeEndpoint(v) { _activeEndpoint = v; },
+    useProxy: _useProxy,
   };
 })();
 /* Expose globally so terminal patches, F5 runner, and language list helpers
@@ -469,7 +472,7 @@ async function runCompiled(code, fileName, write, stdinText = '') {
       write('\x1b[31m✗ Bị chặn CORS / network khi gọi Piston.\x1b[0m\r\n');
       write('\x1b[33m  Server self-host không trả header Access-Control-Allow-Origin.\x1b[0m\r\n');
       write('\x1b[36m  💡 Fix trên Piston: bind container làm image\x1b[0m \x1b[32mghcr.io/engineer-man/piston\x1b[0m\r\n');
-      write('\x1b[36m     và expose port qua Railway, tẠM bật proxy fallback:\x1b[0m \x1b[32mpiston use-proxy on\x1b[0m\r\n');
+      write('\x1b[36m     và expose port qua Railway, tạm bật proxy fallback:\x1b[0m \x1b[32mpiston use-proxy on\x1b[0m\r\n');
       write('\x1b[90m  Active endpoint: ' + (PistonAPI._activeEndpoint || PistonAPI.ENDPOINT) + '\x1b[0m\r\n');
     } else {
       write(`\x1b[31m✗ Error: ${e.message}\x1b[0m\r\n`);
@@ -561,29 +564,33 @@ async function runCompiled(code, fileName, write, stdinText = '') {
         const sub = (args[0] || '').toLowerCase();
         if (sub === 'status' || !sub) {
           const ep = (function(){ try { return localStorage.getItem('procode_piston_endpoint') || ''; } catch(_){ return ''; }})();
-          const proxy = _useProxy();
+          // FIX-SCOPE (v3.1.5): was _useProxy() — ReferenceError outside PistonAPI IIFE
+          const proxy = PistonAPI.useProxy();
           const active = (window.PistonAPI && PistonAPI._activeEndpoint) || '(none yet)';
           writeln('\x1b[36m── Piston runner status ──\x1b[0m');
-          writeln('  default endpoint  : ' + ENDPOINT);
+          // FIX-SCOPE (v3.1.5): was bare ENDPOINT — ReferenceError outside PistonAPI IIFE
+          writeln('  default endpoint  : ' + PistonAPI.ENDPOINT);
           writeln('  fallback endpoints: https://piston-production-ccb3.up.railway.app/api/v2/piston/execute,');
           writeln('                      https://emkc.org/api/v2/piston/execute');
           writeln('  custom endpoint   : ' + (ep || '(unset)'));
           writeln('  use CORS proxy    : ' + (proxy ? '\x1b[32mon\x1b[0m' : '\x1b[33moff\x1b[0m'));
           writeln('  last working URL  : ' + active);
-          writeln('  commands: piston status | ping | use-proxy on|off | set-endpoint <url> | clear-endpoint');
+          writeln('  commands: piston status | ping | use-proxy on|off | set-endpoint <url> | clear-endpoint | reset-cache');
         } else if (sub === 'ping') {
           // Hit each endpoint with a tiny POST and report status / latency.
           // Bypasses CORS surprises by doing a direct fetch and reading
           // ok / status / type — same code paths the runner uses.
           const pingCustomEp = (function(){ try { return localStorage.getItem('procode_piston_endpoint') || ''; } catch(_){ return ''; }})();
-          const proxyOn = _useProxy();
+          // FIX-SCOPE (v3.1.5): was _useProxy() — ReferenceError outside PistonAPI IIFE
+          const proxyOn = PistonAPI.useProxy();
+          // FIX-SCOPE (v3.1.5): was bare ENDPOINT — ReferenceError outside PistonAPI IIFE
           const direct = pingCustomEp
-            ? [pingCustomEp, ENDPOINT, 'https://piston-production-ccb3.up.railway.app/api/v2/piston/execute', 'https://emkc.org/api/v2/piston/execute']
-            : [ENDPOINT, 'https://piston-production-ccb3.up.railway.app/api/v2/piston/execute', 'https://emkc.org/api/v2/piston/execute'];
+            ? [pingCustomEp, PistonAPI.ENDPOINT, 'https://piston-production-ccb3.up.railway.app/api/v2/piston/execute', 'https://emkc.org/api/v2/piston/execute']
+            : [PistonAPI.ENDPOINT, 'https://piston-production-ccb3.up.railway.app/api/v2/piston/execute', 'https://emkc.org/api/v2/piston/execute'];
           const proxied = direct.flatMap(u => [
             'https://corsproxy.io/?' + encodeURIComponent(u),
             'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
-            'https://cors.eu.org/' + u,
+            // FIX-DUPLICATE (v3.1.5): cors.eu.org was listed twice — removed duplicate entry
             'https://cors.eu.org/' + u,
           ]);
           const targets = proxyOn ? [...proxied, ...direct] : [...direct, ...proxied];
@@ -636,8 +643,13 @@ async function runCompiled(code, fileName, write, stdinText = '') {
         } else if (sub === 'clear-endpoint') {
           try { localStorage.removeItem('procode_piston_endpoint'); } catch(_){}
           writeln('\x1b[32m✓ custom endpoint cleared.\x1b[0m');
+        } else if (sub === 'reset-cache') {
+          // UPGRADE (v3.1.5): new sub-command — clears the in-memory cached active
+          // endpoint so the runner retries all endpoints on the next execution.
+          if (window.PistonAPI) PistonAPI._activeEndpoint = null;
+          writeln('\x1b[32m✓ Active endpoint cache cleared — next run will re-probe all endpoints.\x1b[0m');
         } else {
-          writeln('\x1b[33musage:\x1b[0m piston status | use-proxy on|off | set-endpoint <url> | clear-endpoint');
+          writeln('\x1b[33musage:\x1b[0m piston status | ping | use-proxy on|off | set-endpoint <url> | clear-endpoint | reset-cache');
         }
         TM.writePrompt(terminalId);
         return;
@@ -665,8 +677,9 @@ async function runCompiled(code, fileName, write, stdinText = '') {
 
         t.isProcessing = true;
 
-        // Run via Piston
-        runCompiled(code, fileArg, write).then(() => {
+        // FIX-PROCESSING (v3.1.5): use .finally() so isProcessing is always reset,
+        // even when runCompiled() rejects — previously a throw left the terminal stuck.
+        runCompiled(code, fileArg, write).finally(() => {
           TM.writePrompt(terminalId);
           t.isProcessing = false;
         });
@@ -889,18 +902,28 @@ window.runCompiledWithStdin = async function(code, fileName, write, terminalInst
     stdinText = await new Promise(resolve => {
       let buf = '';
       const handler = terminalInstance.onKey(({ key, domEvent }) => {
-        if (domEvent.keyCode === 13) {   // Enter
+        // Enter — submit input
+        if (domEvent.key === 'Enter' || domEvent.keyCode === 13) {
           handler.dispose();
           write('\r\n');
           resolve(buf);
-        } else if (domEvent.key === 'd' && domEvent.ctrlKey) {
+        // Ctrl+D — submit (EOF signal, same as Enter for single-line stdin)
+        } else if (domEvent.ctrlKey && domEvent.key === 'd') {
           handler.dispose();
           write('\r\n');
           resolve(buf);
-        } else if (domEvent.keyCode === 8 && buf.length > 0) {
+        // ESC — cancel / skip stdin (UPGRADE v3.1.5)
+        } else if (domEvent.key === 'Escape') {
+          handler.dispose();
+          write('\r\n');
+          write('\x1b[90m(stdin skipped)\x1b[0m\r\n');
+          resolve('');
+        // Backspace
+        } else if ((domEvent.key === 'Backspace' || domEvent.keyCode === 8) && buf.length > 0) {
           buf = buf.slice(0, -1);
           write('\b \b');
-        } else if (key.length === 1) {
+        // Printable characters only
+        } else if (key.length === 1 && !domEvent.ctrlKey && !domEvent.altKey) {
           buf += key;
           write(key);
         }
